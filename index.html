@@ -1,0 +1,2485 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ファミコン風2D輪投げ (RETRO WANAGE FC '83)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    body {
+      margin: 0;
+      background-color: #0b0c10;
+      color: #f0f0f0;
+      font-family: 'Press Start 2P', monospace, sans-serif;
+      overflow-x: hidden;
+    }
+    .crt-screen {
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 35px rgba(0,0,0,0.9), 0 0 15px rgba(0,0,0,0.8);
+    }
+    .crt-screen::before {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                  linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 255, 0, 0.03));
+      z-index: 20;
+      background-size: 100% 3px, 3px 100%;
+      pointer-events: none;
+    }
+    canvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .fc-btn {
+      background: linear-gradient(to bottom, #d62828, #9e0808);
+      border: 3px solid #fdfdfd;
+      box-shadow: 0 4px 0 #520000;
+      color: #ffffff;
+      text-shadow: 2px 2px 0 #000;
+    }
+    .fc-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #520000;
+    }
+    .fc-btn-gold {
+      background: linear-gradient(to bottom, #f59e0b, #b45309);
+      border: 3px solid #fef08a;
+      box-shadow: 0 4px 0 #78350f;
+      color: #ffffff;
+      text-shadow: 2px 2px 0 #000;
+    }
+    .fc-btn-gold:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #78350f;
+    }
+    .badge-unlocked {
+      border-color: #facc15;
+      background: #1c1917;
+      color: #fef08a;
+      box-shadow: inset 0 0 6px rgba(250, 204, 21, 0.25);
+    }
+    .badge-locked {
+      border-color: #27272a;
+      background: #09090b;
+      color: #71717a;
+    }
+    .menu-item {
+      transition: all 0.15s ease;
+    }
+    .menu-item.active {
+      color: #facc15;
+      text-shadow: 2px 2px 0 #854d0e;
+    }
+    @keyframes garaponSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(720deg); }
+    }
+    .garapon-spinning {
+      animation: garaponSpin 1.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-between min-h-screen p-2 sm:p-4 bg-zinc-950">
+
+  <header class="w-full max-w-xl flex items-center justify-between px-3 py-2 bg-neutral-900 border-2 border-red-700 rounded-lg shadow mb-1 z-30">
+    <div class="flex items-center space-x-2">
+      <span class="inline-block w-2.5 h-2.5 bg-red-600 rounded-full animate-ping"></span>
+      <h1 class="text-xs sm:text-sm text-yellow-400 font-bold tracking-wider">WANAGE FC '83</h1>
+    </div>
+    <div class="flex items-center space-x-2 text-[10px] text-zinc-300">
+      <div class="px-2 py-1 bg-black border border-amber-500 rounded text-amber-300 font-bold">
+        PT: <span id="headerPt">0</span>
+      </div>
+      <button id="menuTopBtn" class="px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-yellow-300 hover:bg-zinc-700 active:scale-95">
+        メニュー
+      </button>
+      <button id="soundToggle" class="px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-yellow-300 hover:bg-zinc-700 active:scale-95">
+        SOUND: ON
+      </button>
+    </div>
+  </header>
+
+  <main class="w-full max-w-xl flex-1 flex flex-col items-center justify-center relative">
+    <div id="gameWrapper" class="relative w-full aspect-[4/3] max-h-[66vh] bg-neutral-900 border-4 sm:border-8 border-red-950 rounded-2xl crt-screen cursor-pointer select-none">
+      
+      <canvas id="gameCanvas" width="256" height="224"></canvas>
+
+      <!-- タイトル画面 -->
+      <div id="titleScreen" class="absolute inset-0 bg-black/95 flex flex-col items-center justify-between p-3.5 z-40 text-center select-none overflow-y-auto">
+        <div class="mt-1 flex flex-col items-center">
+          <p class="text-[9px] text-red-500 tracking-widest font-bold mb-1 animate-pulse">★ NINTEN-FESTIVAL 1983 ★</p>
+          <h2 class="text-sm sm:text-lg text-yellow-400 font-extrabold tracking-widest leading-relaxed drop-shadow-[2px_2px_0_#991b1b]">
+            元祖 縁日輪投げ
+          </h2>
+          <div class="text-[8px] text-zinc-400 mt-0.5">WANAGE RETRO FC EDITION</div>
+        </div>
+
+        <!-- プレイヤー名表示 & タップで変更可能なボタン -->
+        <div id="playerBadgeBtn" class="flex items-center justify-center gap-1.5 px-3 py-1 bg-zinc-900 border border-yellow-500/80 rounded-full cursor-pointer hover:bg-zinc-800 active:scale-95 transition-all shadow my-0.5" title="タップして名前を変更">
+          <span class="text-[8px] text-zinc-400">PLAYER:</span>
+          <span id="titlePlayerName" class="text-[10px] text-yellow-300 font-bold tracking-wider underline decoration-amber-500">player</span>
+          <span class="text-[7px] text-amber-300 bg-amber-950 border border-amber-600/70 rounded px-1 py-0.2">へんこう</span>
+        </div>
+
+        <div class="flex flex-col gap-1.5 my-auto w-64 text-[10px] sm:text-xs">
+          <div id="menuOpt0" class="menu-item active flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60">
+            <span class="cursor-icon mr-2 text-yellow-400">▶</span>
+            <span>1. ゲームスタート</span>
+          </div>
+          <div id="menuOpt1" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60">
+            <span class="cursor-icon mr-2 opacity-0">▶</span>
+            <span>2. あそびかた</span>
+          </div>
+          <div id="menuOpt2" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60">
+            <span class="cursor-icon mr-2 opacity-0">▶</span>
+            <span>3. 景品帳 (コレクション)</span>
+          </div>
+          <div id="menuOpt3" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60">
+            <span class="cursor-icon mr-2 opacity-0">▶</span>
+            <span id="menuSoundLabel">4. サウンド: ON</span>
+          </div>
+          <div id="menuOpt4" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60 text-amber-300">
+            <span class="cursor-icon mr-2 opacity-0">▶</span>
+            <span>5. 縁日ガラポン抽選 (ガチャ)</span>
+          </div>
+          <div id="menuOpt5" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60 text-emerald-300">
+            <span class="cursor-icon mr-2 opacity-0">▶</span>
+            <span>6. 装飾カスタム (きせかえ)</span>
+          </div>
+          <div id="menuOpt6" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60 text-cyan-300">
+            <span class="cursor-icon mr-2 opacity-0">▶</span>
+            <span>7. オンラインランキング</span>
+          </div>
+        </div>
+
+        <div class="mb-1 text-[8px] text-zinc-400 space-y-1">
+          <p class="text-yellow-300">所持ポイント: <span id="titlePt" class="font-bold text-amber-400">0</span> PT</p>
+          <p class="text-zinc-500">▲▼: えらぶ / [A] / [SPACE]: 決定</p>
+        </div>
+      </div>
+
+      <!-- プレイヤーネーム変更モーダル -->
+      <div id="nameChangeModal" class="hidden absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 z-50 text-center select-none">
+        <div class="w-full max-w-xs bg-zinc-900 border-2 border-yellow-500 rounded-xl p-3.5 shadow-2xl flex flex-col items-center gap-3">
+          <div class="text-[11px] text-yellow-400 font-bold tracking-wider">【 なまえのへんこう 】</div>
+          <p class="text-[8px] text-zinc-400 leading-relaxed">ランキングにひょうじされる名前を<br>にゅうりょくしてください (最大10文字)</p>
+          
+          <input type="text" id="nameChangeInput" maxlength="10" placeholder="player" class="w-full bg-black border-2 border-yellow-600 px-3 py-2 text-yellow-300 text-center font-bold text-sm tracking-widest rounded focus:outline-none focus:border-yellow-400 select-text">
+          
+          <div class="flex gap-2 w-full mt-1">
+            <button id="cancelNameChangeBtn" class="flex-1 py-2 bg-zinc-800 border border-zinc-600 text-zinc-300 rounded text-[9px] hover:bg-zinc-700 active:scale-95">
+              もどる
+            </button>
+            <button id="confirmNameChangeBtn" class="flex-1 py-2 fc-btn-gold rounded text-[9px] font-bold">
+              決定する
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ガチャモーダル -->
+      <div id="gachaModal" class="hidden absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-3 z-50 text-center select-none overflow-y-auto">
+        <div class="flex items-center justify-between w-full px-2 border-b border-red-900 pb-1">
+          <span class="text-[10px] text-red-500 font-bold">★ 福引大抽選会 ★</span>
+          <div class="text-[10px] text-amber-300 bg-zinc-900 px-2 py-0.5 rounded border border-amber-600">
+            所持: <span id="gachaPt" class="font-bold">0</span> PT
+          </div>
+        </div>
+
+        <div class="relative my-auto flex flex-col items-center">
+          <div id="garaponContainer" class="relative w-28 h-28 flex items-center justify-center transition-transform">
+            <svg id="garaponWheel" class="w-24 h-24 drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 100 100">
+              <polygon points="30,5 70,5 95,30 95,70 70,95 30,95 5,70 5,30" fill="#a16207" stroke="#713f12" stroke-width="4"/>
+              <polygon points="32,10 68,10 90,32 90,68 68,90 32,90 10,68 10,32" fill="#ca8a04" stroke="#854d0e" stroke-width="2"/>
+              <circle cx="50" cy="50" r="28" fill="none" stroke="#eab308" stroke-width="3" stroke-dasharray="8,6"/>
+              <circle cx="50" cy="50" r="10" fill="#78350f" stroke="#facc15" stroke-width="2"/>
+              <rect x="50" y="47" width="30" height="6" fill="#b91c1c" rx="2"/>
+              <circle cx="80" cy="50" r="5" fill="#fef08a"/>
+              <rect x="44" y="6" width="12" height="6" fill="#451a03" rx="1"/>
+            </svg>
+            <div class="absolute -bottom-3 w-28 h-4 bg-amber-950 border-t-2 border-yellow-600 rounded-sm -z-10"></div>
+          </div>
+
+          <div class="relative w-36 h-8 bg-zinc-900 border-2 border-red-700 rounded-md mt-4 flex items-center justify-center">
+            <div class="text-[8px] text-zinc-500 tracking-wider">玉受け皿</div>
+            <div id="gachaBall" class="absolute -top-3 hidden w-6 h-6 rounded-full border-2 border-white shadow-lg animate-bounce"></div>
+          </div>
+          
+          <div id="gachaResultText" class="mt-2 text-[9px] text-yellow-300 min-h-[2.5rem] flex flex-col items-center justify-center">
+            <span>1回 500 PT でガラガラを回そう！</span>
+            <span class="text-[7px] text-zinc-400">背景・SE・輪・棒の限定デザインが入っています</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-2 w-full max-w-xs items-center">
+          <button id="rollGachaBtn" class="fc-btn-gold w-full py-2.5 rounded-lg text-xs font-bold tracking-wider">
+            ★ ガラポンを回す (500 PT) ★
+          </button>
+          <button id="closeGachaBtn" class="px-4 py-1.5 bg-zinc-800 border border-zinc-600 rounded text-[10px] text-zinc-300 hover:bg-zinc-700">
+            メニューへもどる
+          </button>
+        </div>
+      </div>
+
+      <!-- カスタムモーダル -->
+      <div id="customModal" class="hidden absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-3 z-50 text-left select-none overflow-y-auto">
+        <div class="flex items-center justify-between w-full px-2 border-b border-emerald-900 pb-1">
+          <span class="text-[10px] text-emerald-400 font-bold">★ 装飾・カスタム設定 ★</span>
+          <span class="text-[8px] text-zinc-400">好みの見た目・SEに変更</span>
+        </div>
+
+        <div class="w-full space-y-2.5 my-auto max-h-[52vh] overflow-y-auto p-1 text-[8px] sm:text-[9px]">
+          <div class="bg-zinc-950/80 p-2 border border-zinc-800 rounded">
+            <div class="text-yellow-400 font-bold mb-1">■ ステージ背景</div>
+            <div id="bgCustomList" class="grid grid-cols-3 gap-1.5 text-center"></div>
+          </div>
+
+          <div class="bg-zinc-950/80 p-2 border border-zinc-800 rounded">
+            <div class="text-cyan-400 font-bold mb-1">■ 輪のデザイン</div>
+            <div id="ringCustomList" class="grid grid-cols-3 gap-1.5 text-center"></div>
+          </div>
+
+          <div class="bg-zinc-950/80 p-2 border border-zinc-800 rounded">
+            <div class="text-pink-400 font-bold mb-1">■ 棒のデザイン</div>
+            <div id="pegCustomList" class="grid grid-cols-3 gap-1.5 text-center"></div>
+          </div>
+
+          <div class="bg-zinc-950/80 p-2 border border-zinc-800 rounded">
+            <div class="text-amber-400 font-bold mb-1">■ 効果音 (SEタイプ)</div>
+            <div id="soundCustomList" class="grid grid-cols-3 gap-1.5 text-center"></div>
+          </div>
+        </div>
+
+        <button id="closeCustomBtn" class="fc-btn px-6 py-2 rounded text-xs self-center">
+          メニューへもどる
+        </button>
+      </div>
+
+      <!-- あそびかた説明書 -->
+      <div id="howToModal" class="hidden absolute inset-0 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-between p-3.5 z-50 text-left">
+        <h3 class="text-xs sm:text-sm text-yellow-400 font-bold tracking-wider self-center mb-1">【 あそびかた説明書 】</h3>
+        <div class="text-[8px] sm:text-[9px] text-zinc-300 space-y-2 overflow-y-auto max-h-[50vh] p-2 bg-zinc-950/80 border border-zinc-800 rounded-lg w-full leading-relaxed">
+          <p><span class="text-yellow-400 font-bold">1. 二段階目押しシステム:</span><br>
+          ・Aボタン(SPACE)でまず「横位置」を決定。<br>
+          ・次に往復する「つよさゲージ」を、手前(青)・中央(黄)・奥(赤)の狙いたい列で止めます。黒い部分はハズレです！</p>
+          <p><span class="text-cyan-400 font-bold">2. 輪の増加とボーナス:</span><br>
+          ・入った棒は床下へ沈み、二度と入りません。<br>
+          ・輪は通常では増えず、<strong class="text-pink-400">2連続以上のコンボ</strong>や<strong class="text-yellow-300">ビンゴ成立</strong>でのみ補充されます！</p>
+          <p><span class="text-emerald-400 font-bold">3. 9本制覇とラインバトル:</span><br>
+          ・9本全て沈めるとジャックポット(+1000点 & 輪+5個)！<br>
+          ・その後は手前列・中央列・奥列が1列(3本)ずつ出現するエンドレスラインバトルに突入します。</p>
+          <p><span class="text-amber-400 font-bold">4. ガチャポイント獲得:</span><br>
+          ・ゲーム終了時のスコアの<strong class="text-yellow-300">10%が福引ポイント</strong>として付与されます。たくさん貯めてガラポンを回そう！</p>
+        </div>
+        <button id="closeHowToBtn" class="fc-btn px-6 py-2 rounded text-xs self-center mt-2">
+          もどる
+        </button>
+      </div>
+
+      <!-- ゲームオーバー画面 -->
+      <div id="gameModal" class="hidden absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-3 z-40 text-center overflow-y-auto">
+        <h2 id="modalTitle" class="text-lg sm:text-xl text-red-500 mb-1 tracking-widest font-bold">GAME OVER</h2>
+        
+        <div id="rankBadge" class="text-xs sm:text-sm font-bold text-yellow-300 mb-2 border-2 border-yellow-400 px-3 py-1 rounded bg-black/50">
+          RANK: 輪投げの達人
+        </div>
+
+        <div class="bg-zinc-900 border-2 border-yellow-500 rounded p-2.5 mb-2 text-[10px] sm:text-xs space-y-1.5 w-64 sm:w-72 text-left">
+          <p class="flex justify-between text-zinc-300"><span>FINAL SCORE:</span><span id="finalScore" class="text-yellow-400 font-bold">0</span></p>
+          <p class="flex justify-between text-zinc-300"><span>EARNED POINTS:</span><span id="earnedPt" class="text-amber-300 font-bold">+0 PT</span></p>
+          <p class="flex justify-between text-zinc-300"><span>HI-SCORE:</span><span id="finalHiScore" class="text-white">0</span></p>
+          <p class="flex justify-between text-zinc-300"><span>REACHED ROUND:</span><span id="finalRound" class="text-emerald-400">1</span></p>
+          <p class="flex justify-between text-zinc-300"><span>TOTAL BINGOS:</span><span id="finalBingos" class="text-cyan-400">0</span></p>
+          <p class="flex justify-between text-zinc-300"><span>MAX COMBO:</span><span id="finalCombo" class="text-pink-400">0</span></p>
+          <p class="flex justify-between text-zinc-300"><span>LINES CLEARED:</span><span id="finalLines" class="text-amber-400">0</span></p>
+        </div>
+
+        <div class="flex gap-2 w-64 sm:w-72">
+          <button id="restartBtn" class="fc-btn flex-1 py-2 rounded-lg text-[10px] sm:text-xs tracking-wider">
+            PLAY AGAIN
+          </button>
+          <button id="viewRankingBtn" class="fc-btn-gold flex-1 py-2 rounded-lg text-[10px] sm:text-xs tracking-wider">
+            RANKING
+          </button>
+        </div>
+        <button id="modalTitleBtn" class="mt-1.5 px-4 py-1.5 bg-zinc-800 border border-zinc-600 rounded text-[10px] text-zinc-300 hover:bg-zinc-700">
+          タイトル画面へ
+        </button>
+      </div>
+
+      <!-- 景品帳モーダル -->
+      <div id="prizeModal" class="hidden absolute inset-0 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center p-3 z-50 text-center">
+        <h2 class="text-xs sm:text-sm text-yellow-400 mb-2 tracking-widest font-bold">★ 屋台の景品コレクション ★</h2>
+        <div id="prizeList" class="grid grid-cols-2 gap-2 w-full max-w-sm mb-3 text-[9px] text-left max-h-[50vh] overflow-y-auto p-1.5 bg-zinc-950/90 border border-zinc-800 rounded-lg"></div>
+        <button id="closePrizeBtn" class="fc-btn px-5 py-2 rounded text-xs">
+          閉じる
+        </button>
+      </div>
+
+      <!-- ランキングモーダル -->
+      <div id="rankingModal" class="hidden absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-3 z-50 text-center select-none overflow-y-auto">
+        <div class="flex items-center justify-between w-full px-2 border-b border-cyan-800 pb-1">
+          <span class="text-[10px] text-cyan-400 font-bold">★ オンライン全国ランキング ★</span>
+          <button id="modalChangeNameBtn" class="text-[8px] text-amber-300 underline hover:text-yellow-200">
+            名前変更
+          </button>
+        </div>
+
+        <!-- タブ切り替え -->
+        <div class="flex gap-2 w-full max-w-xs mt-2">
+          <button id="tabScoreRank" class="flex-1 py-1.5 text-[9px] rounded font-bold border border-yellow-400 bg-yellow-950/60 text-yellow-300">
+            最高スコア
+          </button>
+          <button id="tabItemRank" class="flex-1 py-1.5 text-[9px] rounded font-bold border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200">
+            所持アイテム
+          </button>
+        </div>
+
+        <!-- ランキングリスト -->
+        <div class="w-full max-w-xs my-2 bg-zinc-950 border border-zinc-800 rounded p-2 max-h-[42vh] overflow-y-auto text-[9px]">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="text-zinc-500 border-b border-zinc-800 text-[8px]">
+                <th class="py-1 w-10">順位</th>
+                <th class="py-1">名前</th>
+                <th id="rankValueHeader" class="py-1 text-right">スコア</th>
+              </tr>
+            </thead>
+            <tbody id="rankingTableBody"></tbody>
+          </table>
+        </div>
+
+        <button id="closeRankingBtn" class="fc-btn px-6 py-1.5 rounded text-xs self-center">
+          もどる
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="w-full max-w-xl mt-1.5 flex flex-col items-center gap-1.5 z-30">
+    <div class="w-full bg-zinc-900 border-2 border-zinc-700 rounded-xl p-2 sm:p-2.5 shadow-md flex flex-col gap-1.5">
+      <div class="flex items-center justify-between text-[9px] px-1 text-zinc-300 border-b border-zinc-800 pb-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-amber-400 font-bold">風速:</span>
+          <span id="windDisplay" class="text-cyan-300 font-bold">無風 (0m)</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-emerald-400 font-bold">ROUND:</span>
+          <span id="roundDisplay" class="text-yellow-300 font-bold">1 (通常)</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-[9px] sm:text-[10px] w-18 sm:w-20 text-yellow-300 font-bold shrink-0">1.よこ位置:</span>
+        <div class="relative flex-1 h-4 sm:h-5 bg-zinc-950 border-2 border-zinc-600 rounded overflow-hidden">
+          <div class="absolute inset-0 flex justify-between px-4 pointer-events-none opacity-30">
+            <div class="w-0.5 h-full bg-zinc-500"></div>
+            <div class="w-0.5 h-full bg-zinc-500"></div>
+            <div class="w-0.5 h-full bg-yellow-400"></div>
+            <div class="w-0.5 h-full bg-zinc-500"></div>
+            <div class="w-0.5 h-full bg-zinc-500"></div>
+          </div>
+          <div id="aimNeedle" class="absolute top-0 bottom-0 w-2.5 -ml-1.5 bg-yellow-400 border border-white"></div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-[9px] sm:text-[10px] w-18 sm:w-20 text-cyan-300 font-bold shrink-0">2.つよさ:</span>
+        <div class="relative flex-1 h-4 sm:h-5 bg-zinc-950 border-2 border-zinc-600 rounded overflow-hidden">
+          <div id="zoneFront" class="absolute top-0 bottom-0 bg-blue-500/80 border-x border-blue-200"></div>
+          <div id="zoneMid" class="absolute top-0 bottom-0 bg-yellow-500/85 border-x border-yellow-200"></div>
+          <div id="zoneBack" class="absolute top-0 bottom-0 bg-red-600/90 border-x border-red-300"></div>
+          <div id="powerNeedle" class="absolute top-0 bottom-0 w-2.5 -ml-1.5 bg-white border border-red-400 z-10"></div>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center px-1 text-[8px] sm:text-[9px] text-zinc-400">
+        <span id="meterGuideText" class="text-yellow-400 animate-pulse">1. 左右のタイミングでボタンを押せ！</span>
+        <span class="text-zinc-500 hidden sm:inline">青:手前 / 黄:中央 / 赤:奥</span>
+      </div>
+    </div>
+
+    <div class="w-full flex justify-center items-center py-0.5">
+      <button id="actionBtn" class="fc-btn w-full py-3 rounded-xl text-xs sm:text-base tracking-widest font-bold">
+        ★ A BUTTON (THROW / 決定) ★
+      </button>
+    </div>
+  </footer>
+
+  <script>
+    /* ==========================================================================
+       0. オンライン連携設定 (Google Apps Script)
+       ========================================================================== */
+    // ※ デプロイして取得した Web アプリ URL に書き換えてください
+    const GAS_API_URL = https://script.google.com/macros/s/AKfycbzazrJ7j6LtzFz7wAF8KjnvWA3P7U-vPQfzeY65wC_sXh21DlGUDy_Ll_foX4dCda-P/exec;
+
+    /* ==========================================================================
+       1. 音声システム (RetroSound)
+       ========================================================================== */
+    class RetroSound {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.soundType = 'classic';
+        this.bgmTimer = null;
+        this.bgmStep = 0;
+        this.isBgmPlaying = false;
+        this.bgmTempo = 138;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      startBgm() {
+        if (!this.enabled || this.isBgmPlaying) return;
+        this.init();
+        this.isBgmPlaying = true;
+        this.bgmStep = 0;
+        this.scheduleBgmTick();
+      }
+
+      stopBgm() {
+        this.isBgmPlaying = false;
+        if (this.bgmTimer) {
+          clearTimeout(this.bgmTimer);
+          this.bgmTimer = null;
+        }
+      }
+
+      scheduleBgmTick() {
+        if (!this.isBgmPlaying || !this.enabled) return;
+
+        const N = {
+          R: 0,
+          C2: 65.41, D2: 73.42, E2: 82.41, F2: 87.31, G2: 98.00, A2: 110.00, B2: 123.47,
+          C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.00, A3: 220.00, B3: 246.94,
+          C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88,
+          C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00, B5: 987.77,
+          C6: 1046.50
+        };
+
+        const leadTrack = [
+          N.C4, N.R,  N.E4, N.R,  N.G4, N.R,  N.C5, N.R,
+          N.B4, N.C5, N.D5, N.R,  N.G4, N.R,  N.R,  N.R,
+          N.A4, N.R,  N.C5, N.R,  N.E5, N.R,  N.D5, N.C5,
+          N.D5, N.R,  N.G4, N.R,  N.R,  N.R,  N.G4, N.R,
+          N.E5, N.R,  N.D5, N.R,  N.C5, N.R,  N.B4, N.R,
+          N.A4, N.B4, N.C5, N.A4, N.F4, N.R,  N.A4, N.R,
+          N.G4, N.A4, N.B4, N.C5, N.D5, N.E5, N.F5, N.D5,
+          N.C5, N.R,  N.E4, N.F4, N.G4, N.R,  N.R,  N.R
+        ];
+
+        const harmonyTrack = [
+          N.R,  N.R,  N.C4, N.R,  N.E4, N.R,  N.E4, N.R,
+          N.G4, N.R,  N.B4, N.R,  N.D4, N.R,  N.R,  N.R,
+          N.F4, N.R,  N.A4, N.R,  N.C5, N.R,  N.A4, N.R,
+          N.B4, N.R,  N.D4, N.R,  N.R,  N.R,  N.D4, N.R,
+          N.C5, N.R,  N.B4, N.R,  N.A4, N.R,  N.G4, N.R,
+          N.F4, N.R,  N.A4, N.R,  N.D4, N.R,  N.F4, N.R,
+          N.E4, N.R,  N.G4, N.R,  N.B4, N.R,  N.B4, N.R,
+          N.G4, N.R,  N.C4, N.R,  N.E4, N.R,  N.R,  N.R
+        ];
+
+        const bassTrack = [
+          N.C3, N.R, N.C3, N.R, N.G2, N.R, N.E2, N.R,
+          N.G2, N.R, N.B2, N.R, N.D3, N.R, N.G2, N.R,
+          N.A2, N.R, N.C3, N.R, N.E3, N.R, N.A2, N.R,
+          N.G2, N.R, N.B2, N.R, N.D3, N.R, N.G2, N.R,
+          N.F2, N.R, N.A2, N.R, N.C3, N.R, N.F2, N.R,
+          N.D2, N.R, N.F2, N.R, N.A2, N.R, N.D2, N.R,
+          N.G2, N.R, N.B2, N.R, N.D3, N.R, N.F3, N.R,
+          N.C3, N.R, N.G2, N.R, N.C3, N.R, N.G2, N.R
+        ];
+
+        const stepIdx = this.bgmStep % leadTrack.length;
+        const noteDuration = (60 / this.bgmTempo) / 4;
+        const leadNote = leadTrack[stepIdx];
+        const harmNote = harmonyTrack[stepIdx];
+        const bassNote = bassTrack[stepIdx];
+        const now = this.ctx.currentTime;
+
+        if (leadNote > 0) {
+          const osc1 = this.ctx.createOscillator();
+          const gain1 = this.ctx.createGain();
+          osc1.type = this.soundType === 'arcade' ? 'sawtooth' : 'square';
+          osc1.frequency.setValueAtTime(leadNote, now);
+          gain1.gain.setValueAtTime(0.065, now);
+          gain1.gain.exponentialRampToValueAtTime(0.001, now + noteDuration * 1.5);
+          osc1.connect(gain1);
+          gain1.connect(this.ctx.destination);
+          osc1.start(now);
+          osc1.stop(now + noteDuration * 1.5);
+        }
+
+        if (harmNote > 0) {
+          const osc2 = this.ctx.createOscillator();
+          const gain2 = this.ctx.createGain();
+          osc2.type = 'square';
+          osc2.frequency.setValueAtTime(harmNote, now);
+          gain2.gain.setValueAtTime(0.035, now);
+          gain2.gain.exponentialRampToValueAtTime(0.001, now + noteDuration * 1.3);
+          osc2.connect(gain2);
+          gain2.connect(this.ctx.destination);
+          osc2.start(now);
+          osc2.stop(now + noteDuration * 1.3);
+        }
+
+        if (bassNote > 0) {
+          const osc3 = this.ctx.createOscillator();
+          const gain3 = this.ctx.createGain();
+          osc3.type = 'triangle';
+          osc3.frequency.setValueAtTime(bassNote, now);
+          gain3.gain.setValueAtTime(0.12, now);
+          gain3.gain.exponentialRampToValueAtTime(0.001, now + noteDuration * 0.95);
+          osc3.connect(gain3);
+          gain3.connect(this.ctx.destination);
+          osc3.start(now);
+          osc3.stop(now + noteDuration * 0.95);
+        }
+
+        this.bgmStep++;
+        const nextTimeMs = Math.round(noteDuration * 1000);
+        this.bgmTimer = setTimeout(() => this.scheduleBgmTick(), nextTimeMs);
+      }
+
+      playTone(freq, duration, type = 'square', volume = 0.15) {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          let actualType = type;
+          let actualFreq = freq;
+          if (this.soundType === 'arcade') {
+            actualType = 'sawtooth';
+            actualFreq = freq * 1.05;
+          } else if (this.soundType === 'retro8bit') {
+            actualType = 'square';
+          }
+          osc.type = actualType;
+          osc.frequency.setValueAtTime(actualFreq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch(e) {}
+      }
+
+      garaponRattle() {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+              this.playTone(180 + Math.random() * 220, 0.04, 'triangle', 0.2);
+            }, i * 90);
+          }
+        } catch(e) {}
+      }
+
+      throwWhoosh() {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = this.soundType === 'arcade' ? 'sawtooth' : 'triangle';
+          osc.frequency.setValueAtTime(260, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 0.28);
+          gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.28);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.28);
+        } catch(e) {}
+      }
+
+      pegSink() {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.28);
+          gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.28);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.28);
+        } catch(e) {}
+      }
+
+      pegRise() {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(740, this.ctx.currentTime + 0.2);
+          gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.2);
+        } catch(e) {}
+      }
+
+      ringMiss() {
+        this.playTone(110, 0.25, 'sawtooth', 0.18);
+      }
+
+      ringHitPeg() {
+        this.playTone(880, 0.05, 'square', 0.25);
+        setTimeout(() => this.playTone(1320, 0.08, 'square', 0.22), 45);
+      }
+
+      comboSound(count) {
+        const base = 440 + Math.min(count, 8) * 80;
+        this.playTone(base, 0.08, 'square', 0.2);
+        setTimeout(() => this.playTone(base * 1.25, 0.1, 'square', 0.22), 70);
+        setTimeout(() => this.playTone(base * 1.5, 0.15, 'square', 0.25), 140);
+      }
+
+      lineClearFanfare() {
+        const notes = [440, 554, 659, 880];
+        notes.forEach((freq, idx) => {
+          setTimeout(() => this.playTone(freq, 0.1, 'square', 0.22), idx * 60);
+        });
+      }
+
+      bingoFanfare(level = 1) {
+        const notes = [392, 523, 659, 784, 1046, 1318, 1568];
+        const count = Math.min(notes.length, 3 + level * 2);
+        for (let i = 0; i < count; i++) {
+          setTimeout(() => this.playTone(notes[i], 0.14, 'square', 0.25), i * 85);
+        }
+      }
+
+      allClearFanfare() {
+        const melody = [523, 659, 784, 1046, 880, 1046, 1318, 1568, 2093];
+        melody.forEach((f, i) => {
+          setTimeout(() => this.playTone(f, 0.18, 'square', 0.28), i * 95);
+        });
+      }
+
+      unlockSound() {
+        const notes = [587, 740, 880, 1174];
+        notes.forEach((f, i) => {
+          setTimeout(() => this.playTone(f, 0.12, 'square', 0.24), i * 75);
+        });
+      }
+    }
+
+    const sound = new RetroSound();
+
+    /* ==========================================================================
+       2. アイテム・データ定義
+       ========================================================================== */
+    const CANVAS_WIDTH = 256;
+    const CANVAS_HEIGHT = 224;
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const GACHA_ITEMS = [
+      { id: 'bg_matsuri', type: 'bg', name: '夏祭り (夜空)', desc: '提灯と夜空の定番背景', owned: true, ballColor: '#ef4444' },
+      { id: 'bg_sunset',  type: 'bg', name: '黄昏縁日 (夕焼け)', desc: '茜色の夕暮れ屋台', owned: false, ballColor: '#f97316' },
+      { id: 'bg_sakura',  type: 'bg', name: '春宵夜桜 (さくら)', desc: '桜吹雪が舞う幻想ステージ', owned: false, ballColor: '#ec4899' },
+      { id: 'ring_red',   type: 'ring', name: '伝統の赤輪', desc: '昔ながらの朱塗り輪', owned: true, color: '#d62828', highlight: '#ff9999', ballColor: '#ef4444' },
+      { id: 'ring_gold',  type: 'ring', name: '黄金の金輪', desc: 'きらめく真鍮の輪', owned: false, color: '#eab308', highlight: '#fef08a', ballColor: '#eab308' },
+      { id: 'ring_neon',  type: 'ring', name: 'ネオンブルー輪', desc: 'ハイテク光彩の輪', owned: false, color: '#06b6d4', highlight: '#a5f3fc', ballColor: '#06b6d4' },
+      { id: 'peg_wood',   type: 'peg', name: '木彫りポール', desc: '職人仕上げの木製棒', owned: true, mainColor: '#c88e4e', shadowColor: '#8a5726', ballColor: '#a16207' },
+      { id: 'peg_bamboo', type: 'peg', name: '若竹の青竹棒', desc: '清涼感あふれる竹の棒', owned: false, mainColor: '#4ade80', shadowColor: '#15803d', ballColor: '#22c55e' },
+      { id: 'peg_silver', type: 'peg', name: '白銀メタル棒', desc: '鏡面シルバーの合金棒', owned: false, mainColor: '#e2e8f0', shadowColor: '#64748b', ballColor: '#94a3b8' },
+      { id: 'se_classic', type: 'sound', name: 'ファミコン標準', desc: '元祖8-bitスクエア波', owned: true, ballColor: '#ef4444' },
+      { id: 'se_arcade',  type: 'sound', name: 'アーケード鋸波', desc: 'エッジの効いたゲームセンター音', owned: false, ballColor: '#a855f7' },
+      { id: 'se_retro8bit', type: 'sound', name: 'ピコピコチップ', desc: '純度100%のチップチューン', owned: false, ballColor: '#3b82f6' }
+    ];
+
+    let currentCustom = {
+      bg: 'bg_matsuri',
+      ring: 'ring_red',
+      peg: 'peg_wood',
+      sound: 'se_classic'
+    };
+
+    let userPoints = 0;
+    const GACHA_COST = 500;
+
+    const PEGS = [
+      { id: 0, row: 2, col: 0, x: 68,  y: 84,  points: 50,  label: '50', occupied: false, activeInLine: true, sinkProgress: 0 },
+      { id: 1, row: 2, col: 1, x: 128, y: 84,  points: 100, label: '100',occupied: false, activeInLine: true, sinkProgress: 0 },
+      { id: 2, row: 2, col: 2, x: 188, y: 84,  points: 50,  label: '50', occupied: false, activeInLine: true, sinkProgress: 0 },
+      { id: 3, row: 1, col: 0, x: 62,  y: 114, points: 20,  label: '20', occupied: false, activeInLine: true, sinkProgress: 0 },
+      { id: 4, row: 1, col: 1, x: 128, y: 114, points: 30,  label: '30', occupied: false, activeInLine: true, sinkProgress: 0 },
+      { id: 5, row: 1, col: 2, x: 194, y: 114, points: 20,  label: '20', occupied: false, activeInLine: true, sinkProgress: 0 },
+      { id: 6, row: 0, col: 0, x: 56,  y: 144, points: 10,  label: '10', occupied: false, activeInLine: true, sinkProgress: 0 },
+      { id: 7, row: 0, col: 1, x: 128, y: 144, points: 10,  label: '10', occupied: false, activeInLine: true, sinkProgress: 0 },
+      { id: 8, row: 0, col: 2, x: 200, y: 144, points: 10,  label: '10', occupied: false, activeInLine: true, sinkProgress: 0 }
+    ];
+
+    const BINGO_LINES = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6]
+    ];
+    let completedBingoIndices = new Set();
+
+    const PRIZES = [
+      { id: 'prize1', name: '水あめ (飴菓子)', desc: 'スコア 300点 達成', reqScore: 300, unlocked: false, icon: '🍬' },
+      { id: 'prize2', name: 'スーパーボール', desc: 'コンボ 3回 達成', reqCombo: 3, unlocked: false, icon: '🔮' },
+      { id: 'prize3', name: '型抜き菓子', desc: 'ビンゴ 2本 達成', reqBingos: 2, unlocked: false, icon: '🍪' },
+      { id: 'prize4', name: 'ブリキの金魚', desc: '第1ラウンド全制覇', reqAllClear: 1, unlocked: false, icon: '🐟' },
+      { id: 'prize5', name: 'お面 (狐面)', desc: 'ライン制覇 3回 達成', reqLines: 3, unlocked: false, icon: '🦊' },
+      { id: 'prize6', name: '駄菓子屋の金メダル', desc: 'スコア 2500点 達成', reqScore: 2500, unlocked: false, icon: '🥇' },
+      { id: 'prize7', name: '特大くまのぬいぐるみ', desc: 'ROUND 3 到達', reqRound: 3, unlocked: false, icon: '🧸' },
+      { id: 'prize8', name: '伝説の万華鏡', desc: 'スコア 5000点 達成', reqScore: 5000, unlocked: false, icon: '✨' }
+    ];
+
+    /* ==========================================================================
+       3. ローカル保存 & オンラインランキング連携
+       ========================================================================== */
+    const STORAGE_KEY = 'retro_wanage_data_v3';
+    let playerName = 'player';
+    let currentRankingTab = 'score';
+
+    function updatePlayerNameUI() {
+      const titleNameEl = document.getElementById('titlePlayerName');
+      if (titleNameEl) titleNameEl.textContent = playerName;
+    }
+
+    function saveGameToStorage() {
+      try {
+        const ownedItems = GACHA_ITEMS.filter(it => it.owned).map(it => it.id);
+        const unlockedPrizes = PRIZES.filter(pz => pz.unlocked).map(pz => pz.id);
+
+        const data = {
+          playerName,
+          userPoints,
+          hiScore,
+          currentCustom,
+          ownedItems,
+          unlockedPrizes
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch(e) {
+        console.warn('ローカルセーブに失敗しました:', e);
+      }
+    }
+
+    function loadGameFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          updatePlayerNameUI();
+          return;
+        }
+        const data = JSON.parse(raw);
+
+        if (data.playerName) playerName = data.playerName;
+        if (typeof data.userPoints === 'number') userPoints = data.userPoints;
+        if (typeof data.hiScore === 'number') hiScore = data.hiScore;
+        if (data.currentCustom) currentCustom = { ...currentCustom, ...data.currentCustom };
+
+        if (Array.isArray(data.ownedItems)) {
+          GACHA_ITEMS.forEach(it => {
+            if (data.ownedItems.includes(it.id)) it.owned = true;
+          });
+        }
+
+        if (Array.isArray(data.unlockedPrizes)) {
+          PRIZES.forEach(pz => {
+            if (data.unlockedPrizes.includes(pz.id)) pz.unlocked = true;
+          });
+        }
+
+        if (currentCustom.sound === 'se_arcade') sound.soundType = 'arcade';
+        else if (currentCustom.sound === 'se_retro8bit') sound.soundType = 'retro8bit';
+        else sound.soundType = 'classic';
+
+        updatePlayerNameUI();
+      } catch(e) {
+        console.warn('ローカルロードに失敗しました:', e);
+      }
+    }
+
+    // --- オンラインランキング送信 ---
+    async function sendScoreToOnline(finalScore) {
+      if (!GAS_API_URL || GAS_API_URL.includes("ここにデプロイした")) return;
+      const currentOwnedCount = GACHA_ITEMS.filter(it => it.owned).length;
+      try {
+        await fetch(GAS_API_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            name: playerName,
+            score: finalScore,
+            items: currentOwnedCount
+          })
+        });
+      } catch (err) {
+        console.warn("オンラインスコア送信失敗:", err);
+      }
+    }
+
+    // --- オンラインランキング取得 ---
+    async function fetchOnlineRanking(type = 'score') {
+      if (!GAS_API_URL || GAS_API_URL.includes("ここにデプロイした")) return [];
+      try {
+        const res = await fetch(`${GAS_API_URL}?type=${type}`);
+        const json = await res.json();
+        if (json.status === 'ok') {
+          return json.data;
+        }
+      } catch (err) {
+        console.warn("ランキング取得失敗:", err);
+      }
+      return [];
+    }
+
+    function changePlayerName(newName) {
+      const trimmed = newName.trim();
+      if (!trimmed) return;
+
+      if (trimmed.toLowerCase() === 'debug0924') {
+        addPoints(5000);
+        sound.allClearFanfare();
+      }
+
+      playerName = trimmed;
+      updatePlayerNameUI();
+      saveGameToStorage();
+      renderRankingModal();
+    }
+
+    async function renderRankingModal() {
+      const tbody = document.getElementById('rankingTableBody');
+      const headerVal = document.getElementById('rankValueHeader');
+      const tabScore = document.getElementById('tabScoreRank');
+      const tabItem = document.getElementById('tabItemRank');
+
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="3" class="py-6 text-center text-yellow-400 text-[8px] animate-pulse">
+            通信中... つうしんちゅう...
+          </td>
+        </tr>
+      `;
+
+      if (currentRankingTab === 'score') {
+        headerVal.textContent = 'スコア';
+        tabScore.className = 'flex-1 py-1.5 text-[9px] rounded font-bold border border-yellow-400 bg-yellow-950/60 text-yellow-300';
+        tabItem.className = 'flex-1 py-1.5 text-[9px] rounded font-bold border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200';
+      } else {
+        headerVal.textContent = 'アイテム';
+        tabItem.className = 'flex-1 py-1.5 text-[9px] rounded font-bold border border-emerald-400 bg-emerald-950/60 text-emerald-300';
+        tabScore.className = 'flex-1 py-1.5 text-[9px] rounded font-bold border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200';
+      }
+
+      if (!GAS_API_URL || GAS_API_URL.includes("ここにデプロイした")) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="3" class="py-6 text-center text-amber-400 text-[8px] leading-loose">
+              GAS_API_URL が未設定です。<br>
+              スクリプトURLを設定してください。
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      const onlineList = await fetchOnlineRanking(currentRankingTab);
+      tbody.innerHTML = '';
+
+      if (!onlineList || onlineList.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="3" class="py-6 text-center text-zinc-500 text-[8px] leading-loose">
+              まだ きろくが ありません<br>
+              ゲームをプレイして<br>ランクインをめざそう！
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      onlineList.forEach((item, index) => {
+        const isMe = item.name === playerName;
+        const tr = document.createElement('tr');
+        tr.className = `border-b border-zinc-900 ${isMe ? 'text-yellow-300 font-bold bg-yellow-950/40' : 'text-zinc-300'}`;
+
+        let rankColor = 'text-zinc-400';
+        if (index === 0) rankColor = 'text-yellow-400 font-bold';
+        else if (index === 1) rankColor = 'text-slate-300 font-bold';
+        else if (index === 2) rankColor = 'text-amber-500 font-bold';
+
+        const valText = currentRankingTab === 'score' ? `${item.score}点` : `${item.items} / ${GACHA_ITEMS.length}種`;
+
+        tr.innerHTML = `
+          <td class="py-1.5 ${rankColor}">${index + 1}位</td>
+          <td class="py-1.5">${item.name} ${isMe ? '★(YOU)' : ''}</td>
+          <td class="py-1.5 text-right font-mono text-cyan-300">${valText}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    /* ==========================================================================
+       4. ゲームプレイロジック
+       ========================================================================= */
+    const TOTAL_RINGS = 6;
+    let score = 0;
+    let hiScore = 3000;
+    let remainingRings = TOTAL_RINGS;
+    let bingosAchieved = 0;
+    let comboCount = 0;
+    let maxCombo = 0;
+    let allClearCount = 0;
+    let linesClearedTotal = 0;
+
+    let currentRound = 1;
+    let endlessLineMode = false;
+    let currentEndlessRow = 0;
+
+    let gameState = 'TITLE';
+    let selectedMenuIndex = 0;
+    const MENU_COUNT = 7;
+
+    let windSpeed = 0;
+    let meterState = 'AIM_X';
+    let aimX = 0.5;
+    let aimXDirection = 1;
+    let power = 0.0;
+    let powerDirection = 1;
+
+    let powerZones = {
+      front: { start: 0.10, width: 0.18, targetRow: 0 },
+      mid:   { start: 0.42, width: 0.11, targetRow: 1 },
+      back:  { start: 0.76, width: 0.06, targetRow: 2 }
+    };
+
+    let ring = null;
+    let floatingTexts = [];
+    let particles = [];
+    let screenShake = 0;
+
+    const aimNeedle = document.getElementById('aimNeedle');
+    const powerNeedle = document.getElementById('powerNeedle');
+    const zoneFrontEl = document.getElementById('zoneFront');
+    const zoneMidEl = document.getElementById('zoneMid');
+    const zoneBackEl = document.getElementById('zoneBack');
+    const meterGuideText = document.getElementById('meterGuideText');
+    const windDisplay = document.getElementById('windDisplay');
+    const roundDisplay = document.getElementById('roundDisplay');
+    const headerPt = document.getElementById('headerPt');
+    const titlePt = document.getElementById('titlePt');
+    const gachaPt = document.getElementById('gachaPt');
+
+    function updatePointsDisplay() {
+      headerPt.textContent = userPoints;
+      titlePt.textContent = userPoints;
+      gachaPt.textContent = userPoints;
+    }
+
+    function addPoints(pts) {
+      userPoints += pts;
+      updatePointsDisplay();
+      saveGameToStorage();
+    }
+
+    function generatePowerZones() {
+      const roundTighten = Math.min(0.04, (currentRound - 1) * 0.01);
+      const wFront = Math.max(0.12, 0.18 - roundTighten);
+      const wMid   = Math.max(0.08, 0.11 - roundTighten * 0.7);
+      const wBack  = Math.max(0.04, 0.06 - roundTighten * 0.5);
+
+      const gapMin = 0.06;
+      const totalWidth = wFront + wMid + wBack + (gapMin * 2);
+      const freeSpace = Math.max(0.01, 1.0 - totalWidth);
+
+      const r1 = Math.random() * (freeSpace * 0.4);
+      const r2 = Math.random() * (freeSpace * 0.4);
+      const startFront = 0.03 + r1;
+      const startMid   = startFront + wFront + gapMin + (r2 * 0.5);
+      const startBack  = Math.min(0.93 - wBack, startMid + wMid + gapMin + (Math.random() * 0.08));
+
+      powerZones = {
+        front: { start: startFront, width: wFront, targetRow: 0 },
+        mid:   { start: startMid,   width: wMid,   targetRow: 1 },
+        back:  { start: startBack,  width: wBack,  targetRow: 2 }
+      };
+
+      zoneFrontEl.style.left = `${(startFront * 100).toFixed(1)}%`;
+      zoneFrontEl.style.width = `${(wFront * 100).toFixed(1)}%`;
+
+      zoneMidEl.style.left = `${(startMid * 100).toFixed(1)}%`;
+      zoneMidEl.style.width = `${(wMid * 100).toFixed(1)}%`;
+
+      zoneBackEl.style.left = `${(startBack * 100).toFixed(1)}%`;
+      zoneBackEl.style.width = `${(wBack * 100).toFixed(1)}%`;
+
+      if (currentRound >= 2) {
+        windSpeed = Math.floor(Math.random() * 5) - 2;
+      } else {
+        windSpeed = 0;
+      }
+      updateEnvironmentUI();
+    }
+
+    function updateEnvironmentUI() {
+      if (windSpeed === 0) {
+        windDisplay.textContent = '無風 (0m)';
+        windDisplay.className = 'text-cyan-300 font-bold';
+      } else if (windSpeed > 0) {
+        windDisplay.textContent = `追い風 東(${windSpeed}m) ▶`;
+        windDisplay.className = 'text-amber-400 font-bold animate-pulse';
+      } else {
+        windDisplay.textContent = `◀ 向かい風 西(${Math.abs(windSpeed)}m)`;
+        windDisplay.className = 'text-amber-400 font-bold animate-pulse';
+      }
+
+      if (!endlessLineMode) {
+        roundDisplay.textContent = `${currentRound} (通常)`;
+      } else {
+        const rowName = currentEndlessRow === 0 ? '手前列' : (currentEndlessRow === 1 ? '中央列' : '奥列');
+        roundDisplay.textContent = `${currentRound} (LINE: ${rowName})`;
+      }
+    }
+
+    let lastTime = performance.now();
+
+    function gameLoop(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      update(dt);
+      render();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function update(dt) {
+      const speedMultiplier = 1.0 + Math.min(0.6, (currentRound - 1) * 0.15);
+
+      if (meterState === 'AIM_X') {
+        const aimSpeed = 1.65 * speedMultiplier;
+        aimX += aimXDirection * aimSpeed * dt;
+        if (aimX > 1.0) { aimX = 1.0; aimXDirection = -1; }
+        else if (aimX < 0.0) { aimX = 0.0; aimXDirection = 1; }
+        aimNeedle.style.left = `${aimX * 100}%`;
+      } else if (meterState === 'AIM_POWER') {
+        const powerSpeed = 1.95 * speedMultiplier;
+        power += powerDirection * powerSpeed * dt;
+        if (power > 1.0) { power = 1.0; powerDirection = -1; }
+        else if (power < 0.0) { power = 0.0; powerDirection = 1; }
+        powerNeedle.style.left = `${power * 100}%`;
+      }
+
+      PEGS.forEach(peg => {
+        if (peg.occupied && peg.sinkProgress < 1.0) {
+          peg.sinkProgress = Math.min(1.0, peg.sinkProgress + dt * 3.5);
+        } else if (!peg.occupied && peg.activeInLine && peg.sinkProgress > 0.0) {
+          peg.sinkProgress = Math.max(0.0, peg.sinkProgress - dt * 3.8);
+        }
+      });
+
+      if (ring && ring.state === 'flying') {
+        ring.progress += dt / ring.duration;
+        if (ring.progress >= 1.0) {
+          ring.progress = 1.0;
+          checkRingLanding(ring);
+        } else {
+          const t = ring.progress;
+          const windDrift = (windSpeed * 6.0) * Math.sin(t * Math.PI);
+          ring.x = ring.startX + (ring.targetX - ring.startX) * t + windDrift;
+          ring.y = ring.startY + (ring.targetY - ring.startY) * t;
+          ring.heightOffset = 4 * ring.maxArc * t * (1 - t);
+          ring.scale = 1.35 - 0.65 * t;
+        }
+      }
+
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.life -= dt;
+        ft.y -= ft.vy * dt;
+        if (ft.life <= 0) floatingTexts.splice(i, 1);
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.life -= dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 160 * dt;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+
+      if (screenShake > 0) {
+        screenShake = Math.max(0, screenShake - dt * 25);
+      }
+    }
+
+    function checkRingLanding(rObj) {
+      meterState = 'WAIT';
+      rObj.state = 'landing';
+
+      const landX = rObj.x;
+      const landY = rObj.targetY;
+
+      if (!rObj.isZoneHit || rObj.targetRow === null) {
+        handleMiss(landX, landY, 'MISS!');
+        return;
+      }
+
+      if (endlessLineMode && rObj.targetRow !== currentEndlessRow) {
+        handleMiss(landX, landY, 'WRONG ROW!');
+        return;
+      }
+
+      const candidatePegs = PEGS.filter(p => p.row === rObj.targetRow && p.activeInLine);
+      let closestPeg = null;
+      let minDx = 999;
+      let minDy = 999;
+
+      candidatePegs.forEach(peg => {
+        const dx = Math.abs(landX - peg.x);
+        const dy = Math.abs(landY - peg.y);
+        if (dx < minDx) {
+          minDx = dx;
+          minDy = dy;
+          closestPeg = peg;
+        }
+      });
+
+      const isSevereHit = closestPeg && (minDx < 8.5) && (minDy < 8.0);
+
+      if (isSevereHit) {
+        if (closestPeg.occupied) {
+          handleMiss(landX, landY, 'NO TARGET!');
+          return;
+        }
+
+        rObj.x = closestPeg.x;
+        rObj.y = closestPeg.y + 6;
+        rObj.heightOffset = 0;
+        rObj.state = 'done';
+        rObj.hookedPeg = closestPeg;
+        closestPeg.occupied = true;
+        closestPeg.sinkProgress = 0;
+
+        comboCount++;
+        if (comboCount > maxCombo) maxCombo = comboCount;
+
+        score += closestPeg.points;
+        sound.pegSink();
+        screenShake = Math.min(8, 3 + comboCount * 2);
+        spawnExplosionParticles(closestPeg.x, closestPeg.y - 8, 16 + comboCount * 4);
+        sound.ringHitPeg();
+
+        let addedRings = 0;
+        let comboBonusPoints = 0;
+
+        if (closestPeg.points >= 100) {
+          screenShake = 10;
+          spawnFloatingText('100 PTS GET!', closestPeg.x, closestPeg.y - 28, '#ffe600');
+        }
+
+        if (comboCount >= 2) {
+          addedRings = 1;
+          comboBonusPoints = comboCount * 30;
+          score += comboBonusPoints;
+
+          setTimeout(() => {
+            sound.comboSound(comboCount);
+            spawnFloatingText(`COMBO x${comboCount}!`, landX, landY - 22, '#ff4444');
+            spawnFloatingText(`+${closestPeg.points + comboBonusPoints} PTS`, landX, landY - 10, '#ffcc00');
+            spawnFloatingText(`+${addedRings} RING!`, landX, landY + 2, '#00e8d8');
+          }, 80);
+        } else {
+          spawnFloatingText('NICE IN!', closestPeg.x, closestPeg.y - 16, '#00e8d8');
+          spawnFloatingText(`+${closestPeg.points} PTS`, closestPeg.x, closestPeg.y - 6, '#ffcc00');
+        }
+
+        remainingRings += addedRings;
+
+        if (endlessLineMode) {
+          checkEndlessLineCompletion();
+        } else {
+          checkNormalRoundCompletion();
+        }
+
+        checkPrizeUnlocks();
+      } else {
+        if (minDx < 14) {
+          handleMiss(landX, landY, 'NEAR!');
+        } else {
+          handleMiss(landX, landY, 'MISS!');
+        }
+      }
+
+      updateHUD();
+      scheduleNextTurn();
+    }
+
+    function handleMiss(x, y, text) {
+      comboCount = 0;
+      if (ring) {
+        ring.state = 'done';
+        ring.heightOffset = 0;
+      }
+      sound.ringMiss();
+      spawnFloatingText(text, x, y - 8, '#aaaaaa');
+      updateHUD();
+      scheduleNextTurn();
+    }
+
+    function scheduleNextTurn() {
+      setTimeout(() => {
+        if (remainingRings <= 0) {
+          showGameOver();
+        } else {
+          meterState = 'AIM_X';
+          generatePowerZones();
+          updateMeterUI();
+        }
+      }, 700);
+    }
+
+    function checkNormalRoundCompletion() {
+      let newBingos = 0;
+      BINGO_LINES.forEach((line, idx) => {
+        if (!completedBingoIndices.has(idx)) {
+          const isComplete = line.every(pegId => PEGS[pegId].occupied);
+          if (isComplete) {
+            completedBingoIndices.add(idx);
+            newBingos++;
+            bingosAchieved++;
+          }
+        }
+      });
+
+      if (newBingos > 0) {
+        const totalBonus = newBingos * 150;
+        score += totalBonus;
+        remainingRings += newBingos;
+        screenShake = 12;
+        sound.bingoFanfare(bingosAchieved);
+
+        setTimeout(() => {
+          spawnFloatingText('★ BINGO!! ★', 128, 56, '#ffe600');
+          spawnFloatingText(`+${totalBonus} PTS!`, 128, 70, '#ff9900');
+          spawnFloatingText(`+${newBingos} RING!`, 128, 84, '#00e8d8');
+        }, 120);
+      }
+
+      const allOccupied = PEGS.every(p => p.occupied);
+      if (allOccupied) {
+        allClearCount++;
+        triggerAllClear();
+      }
+    }
+
+    function triggerAllClear() {
+      const jackpotBonus = 1000;
+      score += jackpotBonus;
+      remainingRings += 5;
+
+      screenShake = 18;
+      sound.allClearFanfare();
+
+      setTimeout(() => {
+        spawnFloatingText('PERFECT CLEAR!', 128, 38, '#ffe600');
+        spawnFloatingText('+1000 PTS!!', 128, 54, '#ff3366');
+        spawnFloatingText('+5 RINGS GET!', 128, 70, '#00e8d8');
+      }, 200);
+
+      setTimeout(() => {
+        endlessLineMode = true;
+        currentRound++;
+        currentEndlessRow = 0;
+        spawnFloatingText('LINE BATTLE START!', 128, 48, '#00e8d8');
+        setupEndlessLine(currentEndlessRow);
+      }, 1600);
+
+      updateHUD();
+    }
+
+    function setupEndlessLine(row) {
+      currentEndlessRow = row;
+      PEGS.forEach(p => {
+        if (p.row === row) {
+          p.activeInLine = true;
+          p.occupied = false;
+          p.sinkProgress = 1.0;
+        } else {
+          p.activeInLine = false;
+          p.occupied = true;
+          p.sinkProgress = 1.0;
+        }
+      });
+
+      sound.pegRise();
+      const rowName = row === 0 ? 'FRONT LINE!' : (row === 1 ? 'MIDDLE LINE!' : 'BACK LINE!');
+      const targetY = row === 0 ? 144 : (row === 1 ? 114 : 84);
+      spawnFloatingText(rowName, 128, targetY - 24, '#ffe600');
+      spawnExplosionParticles(128, targetY, 20);
+      updateEnvironmentUI();
+    }
+
+    function checkEndlessLineCompletion() {
+      const currentLinePegs = PEGS.filter(p => p.row === currentEndlessRow);
+      const isLineFinished = currentLinePegs.every(p => p.occupied);
+
+      if (isLineFinished) {
+        linesClearedTotal++;
+        const lineBonus = 300 + currentRound * 50;
+        score += lineBonus;
+        remainingRings += 2;
+
+        screenShake = 14;
+        sound.lineClearFanfare();
+
+        setTimeout(() => {
+          spawnFloatingText('★ LINE CLEAR! ★', 128, 54, '#ffe600');
+          spawnFloatingText(`+${lineBonus} PTS!`, 128, 70, '#ff9900');
+          spawnFloatingText('+2 RINGS GET!', 128, 86, '#00e8d8');
+        }, 120);
+
+        setTimeout(() => {
+          let nextRow = currentEndlessRow + 1;
+          if (nextRow > 2) {
+            nextRow = 0;
+            currentRound++;
+            spawnFloatingText(`ROUND ${currentRound} UP!`, 128, 50, '#ff3366');
+          }
+          setupEndlessLine(nextRow);
+        }, 1300);
+      }
+    }
+
+    function spawnExplosionParticles(x, y, count = 16) {
+      const colors = ['#fc9838', '#ffe600', '#fcfcfc', '#00e8d8'];
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 20 + Math.random() * 70;
+        particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 35,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          size: Math.random() < 0.3 ? 3 : 2,
+          life: 0.45 + Math.random() * 0.35
+        });
+      }
+    }
+
+    function spawnFloatingText(text, x, y, color = '#ffffff') {
+      floatingTexts.push({
+        text: text,
+        x: x,
+        y: y,
+        color: color,
+        vy: 20,
+        life: 1.0
+      });
+    }
+
+    function checkPrizeUnlocks() {
+      let newlyUnlocked = false;
+      PRIZES.forEach(pz => {
+        if (!pz.unlocked) {
+          let cond = false;
+          if (pz.reqScore && score >= pz.reqScore) cond = true;
+          if (pz.reqCombo && maxCombo >= pz.reqCombo) cond = true;
+          if (pz.reqBingos && bingosAchieved >= pz.reqBingos) cond = true;
+          if (pz.reqAllClear && allClearCount >= pz.reqAllClear) cond = true;
+          if (pz.reqLines && linesClearedTotal >= pz.reqLines) cond = true;
+          if (pz.reqRound && currentRound >= pz.reqRound) cond = true;
+
+          if (cond) {
+            pz.unlocked = true;
+            newlyUnlocked = true;
+            spawnFloatingText(`景品GET: ${pz.name}!`, 128, 30, '#ffe600');
+          }
+        }
+      });
+      if (newlyUnlocked) {
+        sound.unlockSound();
+        saveGameToStorage();
+      }
+    }
+
+    function renderPrizeModal() {
+      const listEl = document.getElementById('prizeList');
+      listEl.innerHTML = '';
+      PRIZES.forEach(pz => {
+        const item = document.createElement('div');
+        item.className = `p-2 rounded border flex items-center gap-2 ${pz.unlocked ? 'badge-unlocked' : 'badge-locked'}`;
+        item.innerHTML = `
+          <span class="text-base">${pz.unlocked ? pz.icon : '🔒'}</span>
+          <div class="flex-1">
+            <div class="font-bold text-[9px]">${pz.name}</div>
+            <div class="text-[8px] opacity-80">${pz.desc}</div>
+          </div>
+          <span class="text-[8px] font-bold">${pz.unlocked ? '取得済' : '未達成'}</span>
+        `;
+        listEl.appendChild(item);
+      });
+    }
+
+    function handleAction() {
+      sound.init();
+
+      if (meterState === 'AIM_X') {
+        meterState = 'AIM_POWER';
+        power = 0.0;
+        powerDirection = 1;
+        sound.playTone(440, 0.06, 'square', 0.15);
+        updateMeterUI();
+      } else if (meterState === 'AIM_POWER') {
+        meterState = 'THROWING';
+        remainingRings--;
+        sound.playTone(550, 0.08, 'square', 0.18);
+        sound.throwWhoosh();
+
+        const targetX = 45 + aimX * (211 - 45);
+
+        let targetRow = null;
+        let isZoneHit = false;
+
+        if (power >= powerZones.front.start && power <= (powerZones.front.start + powerZones.front.width)) {
+          targetRow = powerZones.front.targetRow;
+          isZoneHit = true;
+        } else if (power >= powerZones.mid.start && power <= (powerZones.mid.start + powerZones.mid.width)) {
+          targetRow = powerZones.mid.targetRow;
+          isZoneHit = true;
+        } else if (power >= powerZones.back.start && power <= (powerZones.back.start + powerZones.back.width)) {
+          targetRow = powerZones.back.targetRow;
+          isZoneHit = true;
+        }
+
+        let targetY;
+        if (targetRow === 2) targetY = 84;
+        else if (targetRow === 1) targetY = 114;
+        else if (targetRow === 0) targetY = 144;
+        else {
+          targetY = power > 0.85 ? 64 : 166;
+        }
+
+        ring = {
+          startX: targetX,
+          startY: 198,
+          targetX: targetX,
+          targetY: targetY,
+          targetRow: targetRow,
+          isZoneHit: isZoneHit,
+          x: targetX,
+          y: 198,
+          progress: 0,
+          duration: 0.56,
+          maxArc: 55,
+          scale: 1.35,
+          heightOffset: 0,
+          state: 'flying',
+          hookedPeg: null
+        };
+
+        updateHUD();
+        updateMeterUI();
+      }
+    }
+
+    function updateMeterUI() {
+      if (meterState === 'AIM_X') {
+        meterGuideText.textContent = '1. よこ位置のタイミングでボタンを押せ！';
+        meterGuideText.className = 'text-yellow-400 animate-pulse';
+      } else if (meterState === 'AIM_POWER') {
+        meterGuideText.textContent = '2. つよさ（青:手前, 黄:中, 赤:奥）を狙え！';
+        meterGuideText.className = 'text-cyan-400 animate-pulse';
+      } else {
+        meterGuideText.textContent = '投擲中...';
+        meterGuideText.className = 'text-zinc-500';
+      }
+    }
+
+    function updateHUD() {
+      if (score > hiScore) {
+        hiScore = score;
+      }
+    }
+
+    function calculateRank() {
+      if (score >= 4000) return '【神業】輪投げ大名人';
+      if (score >= 2500) return '【皆伝】輪投げの達人';
+      if (score >= 1500) return '【熟練】お祭りの名手';
+      if (score >= 800)  return '【中堅】腕利き勝負師';
+      if (score >= 300)  return '【初段】縁日の見習い';
+      return '【素人】お祭りデビュー';
+    }
+
+    function initGame() {
+      score = 0;
+      remainingRings = TOTAL_RINGS;
+      bingosAchieved = 0;
+      comboCount = 0;
+      maxCombo = 0;
+      allClearCount = 0;
+      linesClearedTotal = 0;
+      currentRound = 1;
+      endlessLineMode = false;
+      currentEndlessRow = 0;
+      windSpeed = 0;
+      completedBingoIndices.clear();
+
+      meterState = 'AIM_X';
+      aimX = 0.5;
+      aimXDirection = 1;
+      power = 0.0;
+      powerDirection = 1;
+      ring = null;
+      floatingTexts = [];
+      particles = [];
+      screenShake = 0;
+
+      PEGS.forEach(p => {
+        p.occupied = false;
+        p.activeInLine = true;
+        p.sinkProgress = 0;
+      });
+
+      document.getElementById('gameModal').classList.add('hidden');
+      generatePowerZones();
+      updateHUD();
+      updateMeterUI();
+      updateEnvironmentUI();
+
+      sound.startBgm();
+    }
+
+    function showGameOver() {
+      sound.stopBgm();
+
+      const earned = Math.floor(score * 0.1);
+      addPoints(earned);
+
+      // オンラインランキングへスコア送信
+      sendScoreToOnline(score);
+
+      document.getElementById('finalScore').textContent = score;
+      document.getElementById('earnedPt').textContent = `+${earned} PT (所持: ${userPoints} PT)`;
+      document.getElementById('finalHiScore').textContent = hiScore;
+      document.getElementById('finalRound').textContent = currentRound;
+      document.getElementById('finalBingos').textContent = bingosAchieved;
+      document.getElementById('finalCombo').textContent = maxCombo;
+      document.getElementById('finalLines').textContent = linesClearedTotal;
+      document.getElementById('rankBadge').textContent = `RANK: ${calculateRank()}`;
+      document.getElementById('gameModal').classList.remove('hidden');
+    }
+
+    function drawPixelRect(x, y, w, h, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+    }
+
+    function render() {
+      ctx.save();
+
+      if (screenShake > 0) {
+        const sx = (Math.random() - 0.5) * screenShake;
+        const sy = (Math.random() - 0.5) * screenShake;
+        ctx.translate(sx, sy);
+      }
+
+      const tSec = performance.now() * 0.001;
+
+      if (currentCustom.bg === 'bg_matsuri') {
+        drawPixelRect(0, 0, CANVAS_WIDTH, 48, '#0b0f19');
+        const stars = [[18, 8], [42, 14], [86, 6], [140, 12], [178, 5], [215, 15], [242, 9]];
+        stars.forEach(([sx, sy], i) => {
+          const blink = (Math.sin(tSec * 4 + i) + 1) * 0.5;
+          ctx.fillStyle = blink > 0.4 ? '#ffffff' : '#64748b';
+          ctx.fillRect(sx, sy, 1, 1);
+        });
+
+        const fwCycle1 = (tSec * 0.8) % 2.5;
+        if (fwCycle1 < 1.6) {
+          const fRadius = fwCycle1 * 12;
+          const cx1 = 70, cy1 = 20;
+          for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+            const px = cx1 + Math.cos(a) * fRadius;
+            const py = cy1 + Math.sin(a) * fRadius;
+            const col = (fwCycle1 > 1.1) ? '#fca5a5' : '#ef4444';
+            drawPixelRect(px, py, 2, 2, col);
+            drawPixelRect(cx1 + Math.cos(a + 0.2) * (fRadius * 0.6), cy1 + Math.sin(a + 0.2) * (fRadius * 0.6), 1, 1, '#fde047');
+          }
+        }
+        const fwCycle2 = ((tSec + 1.25) * 0.75) % 2.5;
+        if (fwCycle2 < 1.6) {
+          const fRadius = fwCycle2 * 14;
+          const cx2 = 185, cy2 = 18;
+          for (let a = 0; a < Math.PI * 2; a += Math.PI / 5) {
+            const px = cx2 + Math.cos(a) * fRadius;
+            const py = cy2 + Math.sin(a) * fRadius;
+            drawPixelRect(px, py, 2, 2, '#38bdf8');
+            drawPixelRect(cx2 + Math.cos(a) * (fRadius * 0.5), cy2 + Math.sin(a) * (fRadius * 0.5), 1, 1, '#fef08a');
+          }
+        }
+
+        for (let x = 0; x < CANVAS_WIDTH; x += 16) {
+          const isRed = Math.floor(x / 16) % 2 === 0;
+          drawPixelRect(x, 24, 16, 24, isRed ? '#d62828' : '#f4f4f4');
+          drawPixelRect(x, 46, 16, 2, '#881111');
+        }
+        drawPixelRect(0, 23, CANVAS_WIDTH, 2, '#4a2c11');
+
+        const lanterns = [28, 92, 164, 228];
+        lanterns.forEach(lx => {
+          drawPixelRect(lx + 4, 12, 2, 6, '#222');
+          drawPixelRect(lx, 18, 10, 14, '#ff2a2a');
+          drawPixelRect(lx + 2, 19, 6, 12, '#ffe600');
+          drawPixelRect(lx + 1, 16, 8, 2, '#111');
+          drawPixelRect(lx + 1, 32, 8, 2, '#111');
+        });
+
+      } else if (currentCustom.bg === 'bg_sunset') {
+        const skyBands = [
+          { y: 0,  h: 10, col: '#4c0519' },
+          { y: 10, h: 10, col: '#831843' },
+          { y: 20, h: 10, col: '#9f1239' },
+          { y: 30, h: 10, col: '#be123c' },
+          { y: 40, h: 10, col: '#e11d48' },
+          { y: 50, h: 10, col: '#f97316' },
+          { y: 60, h: 5,  col: '#f59e0b' }
+        ];
+        skyBands.forEach(b => drawPixelRect(0, b.y, CANVAS_WIDTH, b.h, b.col));
+
+        const sunX = 128, sunY = 38;
+        ctx.fillStyle = 'rgba(254, 240, 138, 0.25)';
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, 36, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(251, 146, 60, 0.45)';
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, 26, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#701a75';
+        ctx.beginPath();
+        ctx.moveTo(0, 48);
+        ctx.lineTo(35, 34); ctx.lineTo(80, 45); ctx.lineTo(130, 31);
+        ctx.lineTo(185, 42); ctx.lineTo(230, 33); ctx.lineTo(CANVAS_WIDTH, 44);
+        ctx.lineTo(CANVAS_WIDTH, 48); ctx.lineTo(0, 48);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#2e1065';
+        ctx.beginPath();
+        ctx.moveTo(0, 48);
+        ctx.lineTo(25, 41); ctx.lineTo(60, 47); ctx.lineTo(105, 39);
+        ctx.lineTo(155, 46); ctx.lineTo(210, 38); ctx.lineTo(CANVAS_WIDTH, 45);
+        ctx.lineTo(CANVAS_WIDTH, 48); ctx.lineTo(0, 48);
+        ctx.closePath();
+        ctx.fill();
+
+        drawPixelRect(218, 30, 20, 3, '#1e1b4b');
+        drawPixelRect(220, 27, 16, 2, '#1e1b4b');
+        drawPixelRect(222, 29, 2, 18, '#1e1b4b');
+        drawPixelRect(232, 29, 2, 18, '#1e1b4b');
+
+        const birds = [[48, 16], [56, 14], [64, 18]];
+        birds.forEach(([bx, by]) => {
+          drawPixelRect(bx, by, 3, 1, '#1e1b4b');
+          drawPixelRect(bx - 1, by - 1, 1, 1, '#1e1b4b');
+          drawPixelRect(bx + 3, by - 1, 1, 1, '#1e1b4b');
+        });
+
+      } else if (currentCustom.bg === 'bg_sakura') {
+        drawPixelRect(0, 0, CANVAS_WIDTH, 20, '#0f172a');
+        drawPixelRect(0, 20, CANVAS_WIDTH, 20, '#1e1b4b');
+        drawPixelRect(0, 40, CANVAS_WIDTH, 20, '#312e81');
+
+        ctx.fillStyle = 'rgba(254, 249, 195, 0.2)';
+        ctx.beginPath();
+        ctx.arc(215, 22, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(215, 22, 11, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#291811';
+        ctx.beginPath();
+        ctx.moveTo(0, 60);
+        ctx.lineTo(18, 60);
+        ctx.lineTo(24, 28);
+        ctx.lineTo(55, 14);
+        ctx.lineTo(50, 9);
+        ctx.lineTo(20, 20);
+        ctx.lineTo(0, 30);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(22, 22); ctx.lineTo(110, 8); ctx.lineTo(108, 5); ctx.lineTo(20, 18);
+        ctx.moveTo(45, 15); ctx.lineTo(80, 26); ctx.lineTo(78, 28); ctx.lineTo(42, 17);
+        ctx.moveTo(110, 8); ctx.lineTo(175, 12); ctx.lineTo(173, 14); ctx.lineTo(108, 10);
+        ctx.fill();
+
+        const sakuraClusters = [
+          { x: 30,  y: 12, r: 18, col: '#f472b6' },
+          { x: 55,  y: 8,  r: 22, col: '#fbcfe8' },
+          { x: 85,  y: 14, r: 24, col: '#f472b6' },
+          { x: 115, y: 10, r: 26, col: '#fce7f3' },
+          { x: 145, y: 16, r: 22, col: '#f472b6' },
+          { x: 175, y: 12, r: 20, col: '#fbcfe8' },
+          { x: 205, y: 18, r: 16, col: '#f472b6' },
+          { x: 75,  y: 26, r: 14, col: '#fda4af' },
+          { x: 130, y: 24, r: 15, col: '#fda4af' }
+        ];
+        sakuraClusters.forEach(c => {
+          ctx.fillStyle = c.col;
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        const petalsStatic = [
+          [40, 6], [70, 4], [105, 6], [125, 4], [160, 8], [190, 10], [90, 22]
+        ];
+        petalsStatic.forEach(([px, py]) => {
+          drawPixelRect(px, py, 4, 3, '#ffffff');
+        });
+
+        const bonboris = [65, 120, 165];
+        bonboris.forEach((bx) => {
+          drawPixelRect(bx + 2, 15, 1, 5, '#111827');
+          drawPixelRect(bx - 1, 20, 7, 8, '#ec4899');
+          drawPixelRect(bx, 21, 5, 6, '#fef08a');
+          drawPixelRect(bx - 1, 19, 7, 1, '#111827');
+          drawPixelRect(bx - 1, 28, 7, 1, '#111827');
+        });
+
+        for (let i = 0; i < 18; i++) {
+          const speed = 18 + (i % 5) * 6;
+          const fallY = ((tSec * speed + i * 28) % 190);
+          const sway = Math.sin(tSec * 2.5 + i) * 16;
+          const fallX = (i * 22 + sway + 20) % CANVAS_WIDTH;
+          drawPixelRect(fallX, fallY, 2, 2, i % 2 === 0 ? '#fbcfe8' : '#f472b6');
+        }
+      }
+
+      if (currentCustom.bg === 'bg_matsuri') {
+        drawPixelRect(0, 48, CANVAS_WIDTH, CANVAS_HEIGHT - 48, '#1b382b');
+        for (let y = 52; y < CANVAS_HEIGHT; y += 12) {
+          drawPixelRect(0, y, CANVAS_WIDTH, 1, '#234a39');
+        }
+      } else if (currentCustom.bg === 'bg_sunset') {
+        drawPixelRect(0, 48, CANVAS_WIDTH, CANVAS_HEIGHT - 48, '#541c0e');
+        for (let y = 52; y < CANVAS_HEIGHT; y += 14) {
+          drawPixelRect(0, y, CANVAS_WIDTH, 1, '#782a17');
+          drawPixelRect(0, y + 1, CANVAS_WIDTH, 1, '#3b1208');
+        }
+        for (let x = 20; x < CANVAS_WIDTH; x += 36) {
+          drawPixelRect(x, 48, 1, CANVAS_HEIGHT - 48, '#3b1208');
+        }
+      } else if (currentCustom.bg === 'bg_sakura') {
+        drawPixelRect(0, 48, CANVAS_WIDTH, CANVAS_HEIGHT - 48, '#261b3b');
+        for (let y = 52; y < CANVAS_HEIGHT; y += 12) {
+          drawPixelRect(0, y, CANVAS_WIDTH, 1, '#3a2b56');
+        }
+        const floorPetals = [
+          [16, 68], [42, 85], [12, 130], [240, 72], [225, 115], [242, 150],
+          [30, 180], [70, 195], [195, 190], [230, 205], [140, 198]
+        ];
+        floorPetals.forEach(([px, py]) => {
+          drawPixelRect(px, py, 2, 2, '#f472b6');
+        });
+      }
+
+      ctx.fillStyle = '#0f1a14';
+      ctx.beginPath();
+      ctx.moveTo(34, 62);
+      ctx.lineTo(222, 62);
+      ctx.lineTo(238, 164);
+      ctx.lineTo(18, 164);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#9b6334';
+      ctx.beginPath();
+      ctx.moveTo(36, 60);
+      ctx.lineTo(220, 60);
+      ctx.lineTo(234, 158);
+      ctx.lineTo(22, 158);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#5a3010';
+      ctx.stroke();
+
+      ctx.strokeStyle = '#78431e';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(32, 94);  ctx.lineTo(224, 94);
+      ctx.moveTo(27, 126); ctx.lineTo(229, 126);
+      ctx.stroke();
+
+      if (endlessLineMode) {
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = '#ffe600';
+        ctx.textAlign = 'center';
+        const rowText = currentEndlessRow === 0 ? 'CLEAR FRONT LINE!' : (currentEndlessRow === 1 ? 'CLEAR MID LINE!' : 'CLEAR BACK LINE!');
+        ctx.fillText(`== ${rowText} ==`, 128, 54);
+      }
+
+      for (let r = 2; r >= 0; r--) {
+        const rowPegs = PEGS.filter(p => p.row === r);
+        rowPegs.forEach(peg => renderPeg(peg));
+      }
+
+      if (meterState === 'AIM_X' || meterState === 'AIM_POWER') {
+        const cursorPx = 45 + aimX * (211 - 45);
+        ctx.strokeStyle = meterState === 'AIM_X' ? 'rgba(255, 230, 0, 0.45)' : 'rgba(0, 232, 216, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.moveTo(cursorPx, 60);
+        ctx.lineTo(cursorPx, 185);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      if (ring && (ring.state === 'flying' || ring.state === 'landing')) {
+        renderPixelRing(ring.x, ring.y - ring.heightOffset, ring.scale, ring.heightOffset);
+      }
+
+      particles.forEach(p => {
+        drawPixelRect(p.x, p.y, p.size, p.size, p.color);
+      });
+
+      floatingTexts.forEach(ft => {
+        ctx.save();
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+
+        ctx.fillStyle = '#000000';
+        ctx.fillText(ft.text, ft.x - 1, ft.y);
+        ctx.fillText(ft.text, ft.x + 1, ft.y);
+        ctx.fillText(ft.text, ft.x, ft.y - 1);
+        ctx.fillText(ft.text, ft.x, ft.y + 1);
+
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      });
+
+      renderHUD();
+      ctx.restore();
+    }
+
+    function renderPeg(peg) {
+      const px = peg.x;
+      const py = peg.y;
+
+      ctx.fillStyle = '#3a1f0a';
+      ctx.beginPath();
+      ctx.ellipse(px, py + 1, 8, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const defaultHeight = 22;
+      const isVisibleRow = !endlessLineMode || peg.activeInLine;
+      const currentHeight = isVisibleRow ? defaultHeight * (1.0 - (peg.sinkProgress || 0)) : 0;
+
+      const pegConfig = GACHA_ITEMS.find(it => it.id === currentCustom.peg) || GACHA_ITEMS.find(it => it.id === 'peg_wood');
+      const mainCol = pegConfig.mainColor;
+      const shadowCol = pegConfig.shadowColor;
+
+      if (currentHeight > 1.5) {
+        const shadowLength = 11 * (1.0 - (peg.sinkProgress || 0));
+        ctx.fillStyle = 'rgba(15, 8, 3, 0.45)';
+        ctx.beginPath();
+        ctx.moveTo(px - 3, py);
+        ctx.lineTo(px + shadowLength, py - shadowLength * 0.4);
+        ctx.lineTo(px + shadowLength, py - shadowLength * 0.4 + 4);
+        ctx.lineTo(px + 3, py + 2);
+        ctx.closePath();
+        ctx.fill();
+
+        const topY = py - currentHeight;
+        const poleWidth = 6;
+        drawPixelRect(px - poleWidth / 2, topY, poleWidth, currentHeight, mainCol);
+        drawPixelRect(px - poleWidth / 2 + 1, topY, 2, currentHeight, '#ffffff88');
+        drawPixelRect(px + poleWidth / 2 - 2, topY, 2, currentHeight, shadowCol);
+
+        ctx.fillStyle = peg.points >= 100 ? '#ff0055' : peg.points >= 50 ? '#00e8d8' : '#ffe600';
+        ctx.beginPath();
+        ctx.ellipse(px, topY, 3, 1.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const isTargetLine = !endlessLineMode || peg.activeInLine;
+      drawPixelRect(px - 13, py + 3, 26, 9, '#000000');
+      drawPixelRect(px - 12, py + 4, 24, 7, peg.occupied ? '#fc9838' : (isTargetLine ? '#222233' : '#111116'));
+
+      ctx.font = '6px "Press Start 2P", monospace';
+      ctx.fillStyle = peg.occupied ? '#000000' : (isTargetLine ? '#fcfcfc' : '#555566');
+      ctx.textAlign = 'center';
+      ctx.fillText(peg.label, px, py + 10);
+      ctx.textAlign = 'start';
+
+      if (peg.occupied) {
+        const ringY = py - Math.max(2, currentHeight * 0.4);
+        renderPixelRing(px, ringY, 0.85, 0);
+      }
+    }
+
+    function renderPixelRing(x, y, scale = 1.0, height = 0) {
+      const rx = Math.max(2, 11 * scale);
+      const ry = Math.max(1, 5 * scale);
+
+      const ringConfig = GACHA_ITEMS.find(it => it.id === currentCustom.ring) || GACHA_ITEMS.find(it => it.id === 'ring_red');
+      const ringMain = ringConfig.color;
+      const ringHigh = ringConfig.highlight;
+
+      if (height > 3) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(x, y + height, rx * 0.85, ry * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.lineWidth = Math.max(1.5, 3 * scale);
+      ctx.strokeStyle = ringMain;
+      ctx.beginPath();
+      ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.lineWidth = Math.max(1, 1.5 * scale);
+      ctx.strokeStyle = ringHigh;
+      ctx.beginPath();
+      ctx.ellipse(x, y - 0.5, rx * 0.9, ry * 0.8, 0, Math.PI * 0.8, Math.PI * 1.6);
+      ctx.stroke();
+    }
+
+    function renderHUD() {
+      drawPixelRect(0, 0, CANVAS_WIDTH, 18, '#000000');
+      drawPixelRect(0, 18, CANVAS_WIDTH, 1, '#333333');
+
+      ctx.font = '7px "Press Start 2P", monospace';
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('SCORE', 6, 12);
+      ctx.fillStyle = '#ffe600';
+      ctx.fillText(`${score}`, 48, 12);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('RING', 110, 12);
+      ctx.fillStyle = '#00e8d8';
+      let ringDots = '●'.repeat(Math.min(remainingRings, 6));
+      if (remainingRings > 6) ringDots += `+${remainingRings - 6}`;
+      ctx.fillText(ringDots, 146, 12);
+
+      if (comboCount >= 2) {
+        ctx.fillStyle = '#ff4444';
+        ctx.fillText(`C:${comboCount}`, 214, 12);
+      }
+    }
+
+    let isRollingGacha = false;
+
+    function rollGaraponGacha() {
+      if (isRollingGacha) return;
+
+      if (userPoints < GACHA_COST) {
+        document.getElementById('gachaResultText').innerHTML = `
+          <span class="text-red-400 font-bold">ポイントが足りません！ (必要: ${GACHA_COST} PT)</span>
+          <span class="text-[7px] text-zinc-400">ゲームを遊んでスコアの10%を獲得しよう</span>
+        `;
+        sound.ringMiss();
+        return;
+      }
+
+      userPoints -= GACHA_COST;
+      updatePointsDisplay();
+      isRollingGacha = true;
+
+      const garaponWheel = document.getElementById('garaponWheel');
+      const gachaBall = document.getElementById('gachaBall');
+      const rollBtn = document.getElementById('rollGachaBtn');
+      const resultText = document.getElementById('gachaResultText');
+
+      rollBtn.disabled = true;
+      rollBtn.classList.add('opacity-50');
+      gachaBall.classList.add('hidden');
+      resultText.innerHTML = '<span class="text-yellow-400 font-bold animate-pulse">ガラガラ... ガラガラ...</span>';
+
+      sound.garaponRattle();
+      garaponWheel.classList.add('garapon-spinning');
+
+      setTimeout(() => {
+        garaponWheel.classList.remove('garapon-spinning');
+
+        const unownedItems = GACHA_ITEMS.filter(it => !it.owned);
+        let wonItem;
+        let isDuplicate = false;
+
+        if (unownedItems.length > 0 && Math.random() < 0.75) {
+          const randIdx = Math.floor(Math.random() * unownedItems.length);
+          wonItem = unownedItems[randIdx];
+          wonItem.owned = true;
+        } else {
+          const randIdx = Math.floor(Math.random() * GACHA_ITEMS.length);
+          wonItem = GACHA_ITEMS[randIdx];
+          if (!wonItem.owned) {
+            wonItem.owned = true;
+          } else {
+            isDuplicate = true;
+            userPoints += 150;
+            updatePointsDisplay();
+          }
+        }
+
+        gachaBall.style.backgroundColor = wonItem.ballColor || '#facc15';
+        gachaBall.classList.remove('hidden');
+
+        sound.allClearFanfare();
+
+        if (isDuplicate) {
+          resultText.innerHTML = `
+            <span class="text-orange-400 font-bold">【重複】${wonItem.name}</span>
+            <span class="text-[7px] text-yellow-300">すでに所持しています (+150 PT 還元！)</span>
+          `;
+        } else {
+          resultText.innerHTML = `
+            <span class="text-emerald-400 font-bold">★ GET!! 【${wonItem.name}】★</span>
+            <span class="text-[7px] text-zinc-300">${wonItem.desc} (カスタムで設定可能)</span>
+          `;
+        }
+
+        isRollingGacha = false;
+        rollBtn.disabled = false;
+        rollBtn.classList.remove('opacity-50');
+        renderCustomModal();
+        saveGameToStorage();
+        
+        // アイテム数更新のためオンラインにも通知
+        sendScoreToOnline(hiScore);
+      }, 1600);
+    }
+
+    function renderCustomModal() {
+      renderCustomCategory('bg', 'bgCustomList');
+      renderCustomCategory('ring', 'ringCustomList');
+      renderCustomCategory('peg', 'pegCustomList');
+      renderCustomCategory('sound', 'soundCustomList');
+    }
+
+    function renderCustomCategory(type, containerId) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      const items = GACHA_ITEMS.filter(it => it.type === type);
+
+      items.forEach(it => {
+        const isSelected = currentCustom[type] === it.id;
+        const btn = document.createElement('div');
+        btn.className = `p-1.5 rounded border text-[8px] flex flex-col items-center justify-between cursor-pointer transition-all ${
+          !it.owned 
+            ? 'border-zinc-800 bg-zinc-950/70 text-zinc-600 cursor-not-allowed'
+            : isSelected 
+              ? 'border-yellow-400 bg-yellow-950/50 text-yellow-300 font-bold ring-2 ring-yellow-500' 
+              : 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+        }`;
+
+        btn.innerHTML = `
+          <div class="truncate w-full font-bold mb-0.5">${it.name}</div>
+          <div class="text-[7px] opacity-75">${!it.owned ? '🔒 未所持' : (isSelected ? '★ 選択中' : '適用する')}</div>
+        `;
+
+        if (it.owned) {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            currentCustom[type] = it.id;
+            if (type === 'sound') {
+              if (it.id === 'se_arcade') sound.soundType = 'arcade';
+              else if (it.id === 'se_retro8bit') sound.soundType = 'retro8bit';
+              else sound.soundType = 'classic';
+            }
+            sound.playTone(660, 0.08, 'square', 0.2);
+            renderCustomModal();
+            saveGameToStorage();
+          });
+        }
+        container.appendChild(btn);
+      });
+    }
+
+    /* ==========================================================================
+       5. イベントハンドラ & UI連動
+       ========================================================================== */
+    const actionBtn = document.getElementById('actionBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const soundToggle = document.getElementById('soundToggle');
+    const closePrizeBtn = document.getElementById('closePrizeBtn');
+    const prizeModal = document.getElementById('prizeModal');
+    const gachaModal = document.getElementById('gachaModal');
+    const rollGachaBtn = document.getElementById('rollGachaBtn');
+    const closeGachaBtn = document.getElementById('closeGachaBtn');
+    const customModal = document.getElementById('customModal');
+    const closeCustomBtn = document.getElementById('closeCustomBtn');
+    const gameWrapper = document.getElementById('gameWrapper');
+    const titleScreen = document.getElementById('titleScreen');
+    const howToModal = document.getElementById('howToModal');
+    const closeHowToBtn = document.getElementById('closeHowToBtn');
+    const menuTopBtn = document.getElementById('menuTopBtn');
+    const modalTitleBtn = document.getElementById('modalTitleBtn');
+    const menuSoundLabel = document.getElementById('menuSoundLabel');
+
+    const rankingModal = document.getElementById('rankingModal');
+    const closeRankingBtn = document.getElementById('closeRankingBtn');
+    const tabScoreRank = document.getElementById('tabScoreRank');
+    const tabItemRank = document.getElementById('tabItemRank');
+    const viewRankingBtn = document.getElementById('viewRankingBtn');
+    const modalChangeNameBtn = document.getElementById('modalChangeNameBtn');
+
+    const nameChangeModal = document.getElementById('nameChangeModal');
+    const nameChangeInput = document.getElementById('nameChangeInput');
+    const confirmNameChangeBtn = document.getElementById('confirmNameChangeBtn');
+    const cancelNameChangeBtn = document.getElementById('cancelNameChangeBtn');
+    const playerBadgeBtn = document.getElementById('playerBadgeBtn');
+
+    function openNameChangeModal() {
+      nameChangeInput.value = playerName;
+      nameChangeModal.classList.remove('hidden');
+      setTimeout(() => {
+        nameChangeInput.focus();
+        nameChangeInput.select();
+      }, 50);
+    }
+
+    function closeNameChangeModal() {
+      nameChangeModal.classList.add('hidden');
+    }
+
+    playerBadgeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openNameChangeModal();
+    });
+
+    modalChangeNameBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openNameChangeModal();
+    });
+
+    confirmNameChangeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const val = nameChangeInput.value.trim() || 'player';
+      changePlayerName(val);
+      sound.playTone(880, 0.08, 'square', 0.2);
+      closeNameChangeModal();
+    });
+
+    cancelNameChangeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeNameChangeModal();
+    });
+
+    nameChangeInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        const val = nameChangeInput.value.trim() || 'player';
+        changePlayerName(val);
+        sound.playTone(880, 0.08, 'square', 0.2);
+        closeNameChangeModal();
+      } else if (e.key === 'Escape') {
+        closeNameChangeModal();
+      }
+    });
+
+    function triggerAction(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      window.focus();
+      handleAction();
+    }
+
+    actionBtn.addEventListener('click', triggerAction);
+    actionBtn.addEventListener('touchstart', triggerAction, { passive: false });
+
+    gameWrapper.addEventListener('click', (e) => {
+      if (gameState === 'PLAYING' && document.getElementById('gameModal').classList.contains('hidden') && prizeModal.classList.contains('hidden')) {
+        triggerAction(e);
+      }
+    });
+
+    restartBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      initGame();
+    });
+
+    closePrizeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      prizeModal.classList.add('hidden');
+    });
+
+    rollGachaBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      rollGaraponGacha();
+    });
+
+    closeGachaBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      gachaModal.classList.add('hidden');
+    });
+
+    closeCustomBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      customModal.classList.add('hidden');
+    });
+
+    closeRankingBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      rankingModal.classList.add('hidden');
+    });
+
+    tabScoreRank.addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentRankingTab = 'score';
+      renderRankingModal();
+    });
+
+    tabItemRank.addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentRankingTab = 'item';
+      renderRankingModal();
+    });
+
+    viewRankingBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      renderRankingModal();
+      rankingModal.classList.remove('hidden');
+    });
+
+    soundToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sound.enabled = !sound.enabled;
+      soundToggle.textContent = `SOUND: ${sound.enabled ? 'ON' : 'OFF'}`;
+      menuSoundLabel.textContent = `4. サウンド: ${sound.enabled ? 'ON' : 'OFF'}`;
+      soundToggle.classList.toggle('text-yellow-300', sound.enabled);
+      soundToggle.classList.toggle('text-zinc-500', !sound.enabled);
+      if (!sound.enabled) {
+        sound.stopBgm();
+      } else if (gameState === 'PLAYING') {
+        sound.startBgm();
+      }
+    });
+
+    function updateMenuSelection(index) {
+      selectedMenuIndex = (index + MENU_COUNT) % MENU_COUNT;
+      for (let i = 0; i < MENU_COUNT; i++) {
+        const item = document.getElementById(`menuOpt${i}`);
+        if (!item) continue;
+        const cursor = item.querySelector('.cursor-icon');
+        if (i === selectedMenuIndex) {
+          item.classList.add('active');
+          cursor.classList.remove('opacity-0');
+        } else {
+          item.classList.remove('active');
+          cursor.classList.add('opacity-0');
+        }
+      }
+      sound.playTone(440, 0.04, 'square', 0.12);
+    }
+
+    function executeMenuSelection() {
+      sound.playTone(880, 0.08, 'square', 0.18);
+      setTimeout(() => sound.playTone(1320, 0.12, 'square', 0.2), 60);
+
+      switch (selectedMenuIndex) {
+        case 0:
+          startGameFromMenu();
+          break;
+        case 1:
+          howToModal.classList.remove('hidden');
+          break;
+        case 2:
+          renderPrizeModal();
+          prizeModal.classList.remove('hidden');
+          break;
+        case 3:
+          sound.enabled = !sound.enabled;
+          menuSoundLabel.textContent = `4. サウンド: ${sound.enabled ? 'ON' : 'OFF'}`;
+          soundToggle.textContent = `SOUND: ${sound.enabled ? 'ON' : 'OFF'}`;
+          soundToggle.classList.toggle('text-yellow-300', sound.enabled);
+          soundToggle.classList.toggle('text-zinc-500', !sound.enabled);
+          if (!sound.enabled) {
+            sound.stopBgm();
+          }
+          break;
+        case 4:
+          updatePointsDisplay();
+          gachaModal.classList.remove('hidden');
+          break;
+        case 5:
+          renderCustomModal();
+          customModal.classList.remove('hidden');
+          break;
+        case 6:
+          renderRankingModal();
+          rankingModal.classList.remove('hidden');
+          break;
+      }
+    }
+
+    function startGameFromMenu() {
+      titleScreen.classList.add('hidden');
+      gameState = 'PLAYING';
+      initGame();
+    }
+
+    function returnToTitle() {
+      gameState = 'TITLE';
+      sound.stopBgm();
+      document.getElementById('gameModal').classList.add('hidden');
+      prizeModal.classList.add('hidden');
+      howToModal.classList.add('hidden');
+      gachaModal.classList.add('hidden');
+      customModal.classList.add('hidden');
+      rankingModal.classList.add('hidden');
+      nameChangeModal.classList.add('hidden');
+      titleScreen.classList.remove('hidden');
+      updatePointsDisplay();
+      updatePlayerNameUI();
+      updateMenuSelection(0);
+    }
+
+    for (let i = 0; i < MENU_COUNT; i++) {
+      const item = document.getElementById(`menuOpt${i}`);
+      if (!item) continue;
+      item.addEventListener('mouseenter', () => updateMenuSelection(i));
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectedMenuIndex = i;
+        executeMenuSelection();
+      });
+    }
+
+    menuTopBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      returnToTitle();
+    });
+
+    modalTitleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      returnToTitle();
+    });
+
+    closeHowToBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      howToModal.classList.add('hidden');
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (!nameChangeModal.classList.contains('hidden')) {
+        return;
+      }
+
+      if (gameState === 'TITLE') {
+        const anyModalOpen = !howToModal.classList.contains('hidden') ||
+                             !prizeModal.classList.contains('hidden') ||
+                             !gachaModal.classList.contains('hidden') ||
+                             !customModal.classList.contains('hidden') ||
+                             !rankingModal.classList.contains('hidden');
+
+        if (anyModalOpen) {
+          if (e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space') {
+            e.preventDefault();
+            howToModal.classList.add('hidden');
+            prizeModal.classList.add('hidden');
+            gachaModal.classList.add('hidden');
+            customModal.classList.add('hidden');
+            rankingModal.classList.add('hidden');
+          }
+          return;
+        }
+
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+          e.preventDefault();
+          updateMenuSelection(selectedMenuIndex - 1);
+        } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+          e.preventDefault();
+          updateMenuSelection(selectedMenuIndex + 1);
+        } else if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyZ' || e.code === 'KeyX') {
+          e.preventDefault();
+          executeMenuSelection();
+        }
+        return;
+      }
+
+      if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32 ||
+          e.code === 'Enter' || e.code === 'KeyZ' || e.code === 'KeyX') {
+        e.preventDefault();
+        const noModals = prizeModal.classList.contains('hidden') && 
+                         howToModal.classList.contains('hidden') && 
+                         gachaModal.classList.contains('hidden') && 
+                         customModal.classList.contains('hidden') &&
+                         rankingModal.classList.contains('hidden');
+        if (noModals) {
+          triggerAction();
+        }
+      }
+    });
+
+    window.onload = () => {
+      loadGameFromStorage();
+      updatePointsDisplay();
+      titleScreen.classList.remove('hidden');
+      updateMenuSelection(0);
+      renderCustomModal();
+      requestAnimationFrame(gameLoop);
+    };
+  </script>
+</body>
+</html>
