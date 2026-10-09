@@ -185,7 +185,7 @@
           <div class="text-[8px] text-zinc-400 text-left bg-black/60 p-2 rounded border border-zinc-800 space-y-1 w-full">
             <p>・せいげん時間: 60秒</p>
             <p>・棒はひっこまず、何回でも入る！</p>
-            <p>・コンボ＆ビンゴでハイスコアを狙え！</p>
+            <p>・3連続INで得点2倍のFEVER突入！</p>
           </div>
           <div class="flex gap-2 w-full mt-1">
             <button id="cancelTaBtn" class="flex-1 py-2 bg-zinc-800 border border-zinc-600 text-zinc-300 rounded text-[9px] hover:bg-zinc-700 active:scale-95">
@@ -299,15 +299,15 @@
       <div id="howToModal" class="hidden absolute inset-0 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-between p-3.5 z-50 text-left">
         <h3 class="text-xs sm:text-sm text-yellow-400 font-bold tracking-wider self-center mb-1">【 あそびかた説明書 】</h3>
         <div class="text-[8px] sm:text-[9px] text-zinc-300 space-y-2 overflow-y-auto max-h-[50vh] p-2 bg-zinc-950/80 border border-zinc-800 rounded-lg w-full leading-relaxed">
-          <p><span class="text-yellow-400 font-bold">1. 二段階目押しシステム:</span><br>
-          ・Aボタン(SPACE)でまず「横位置」を決定。<br>
-          ・次に往復する「つよさゲージ」を、手前(青)・中央(黄)・奥(赤)の狙いたい列で止めます。黒い部分はハズレです！</p>
+          <p><span class="text-yellow-400 font-bold">1. 二段階目押し & PERFECT判定:</span><br>
+          ・Aボタン(SPACE)でまず「横位置」、次に「つよさゲージ」を止めます。<br>
+          ・ゲージの中心で止めると<strong class="text-cyan-300">PERFECT (+50点)</strong>、両方中央なら<strong class="text-yellow-300">DOUBLE PERFECT (+150点)</strong>ボーナス！</p>
           <p><span class="text-cyan-400 font-bold">2. 通常モードと輪の増加:</span><br>
-          ・通常モードでは入った棒は床下へ沈み、二度と入りません。<br>
+          ・入った棒は床下へ沈み、二度と入りません。<br>
           ・輪は2連続以上のコンボやビンゴ成立でのみ補充されます！</p>
-          <p><span class="text-amber-400 font-bold">3. タイムアタックモード:</span><br>
-          ・制限時間60秒！輪は無限に投げられます。<br>
-          ・棒は沈まず同じ棒に何回入ってもOK！コンボとビンゴでハイスコアを競おう！残り10秒はBGMが超加速！</p>
+          <p><span class="text-amber-400 font-bold">3. タイムアタック & FEVER:</span><br>
+          ・制限時間60秒！輪は無制限。棒は沈まず何度でも狙えます。<br>
+          ・<strong class="text-red-400">3連続INでFEVER発動！</strong>点数がすべて2倍になります(MISSで終了)。残り10秒はBGMが超加速！</p>
           <p><span class="text-emerald-400 font-bold">4. ガチャポイント獲得:</span><br>
           ・ゲーム終了時のスコアの10%が福引ポイントとして付与されます。</p>
         </div>
@@ -366,7 +366,7 @@
           </button>
         </div>
 
-        <!-- タブ切り替え (タイムアタック追加) -->
+        <!-- タブ切り替え -->
         <div class="flex gap-1.5 w-full max-w-xs mt-2">
           <button id="tabScoreRank" class="flex-1 py-1.5 text-[8px] sm:text-[9px] rounded font-bold border border-yellow-400 bg-yellow-950/60 text-yellow-300">
             通常
@@ -1019,6 +1019,12 @@
     let allClearCount = 0;
     let linesClearedTotal = 0;
 
+    // FEVER & PERFECT 判定用変数
+    let isFever = false;
+    let feverMultiplier = 1;
+    let perfectAimX = false;
+    let perfectPower = false;
+
     let currentRound = 1;
     let endlessLineMode = false;
     let currentEndlessRow = 0;
@@ -1030,7 +1036,7 @@
 
     let gameState = 'TITLE';
     let selectedMenuIndex = 0;
-    const MENU_COUNT = 8; // タイムアタック追加に伴い 7 -> 8
+    const MENU_COUNT = 8;
 
     let windSpeed = 0;
     let meterState = 'AIM_X';
@@ -1170,7 +1176,7 @@
         timeRemaining -= dt;
         if (timeRemaining <= 10 && !isSpeedBgm) {
           isSpeedBgm = true;
-          sound.setTempo(190); // 残り10秒でBGM加速
+          sound.setTempo(190);
         }
         if (timeRemaining <= 0) {
           timeRemaining = 0;
@@ -1206,7 +1212,7 @@
             peg.sinkProgress = Math.max(0.0, peg.sinkProgress - dt * 3.8);
           }
         } else {
-          peg.sinkProgress = 0; // タイムアタックでは沈まない
+          peg.sinkProgress = 0;
         }
       });
 
@@ -1297,11 +1303,37 @@
         comboCount++;
         if (comboCount > maxCombo) maxCombo = comboCount;
 
-        score += closestPeg.points;
+        // --- FEVER突入判定 (タイムアタック限定: 3コンボ以上) ---
+        if (isTimeAttack && comboCount >= 3 && !isFever) {
+          isFever = true;
+          feverMultiplier = 2;
+          screenShake = 16;
+          sound.allClearFanfare();
+          spawnFloatingText('★ FEVER TIME!! ★', 128, 40, '#ff3366');
+          spawnFloatingText('POINTS x2!!', 128, 54, '#ffe600');
+        }
+
+        // --- PERFECT判定ボーナス ---
+        let perfectBonus = 0;
+        if (perfectAimX && perfectPower) {
+          perfectBonus = 150;
+          screenShake = 12;
+          spawnFloatingText('DOUBLE PERFECT!!', landX, landY - 26, '#00e8d8');
+          spawnFloatingText('+150 PTS', landX, landY - 14, '#ffe600');
+        } else if (perfectAimX || perfectPower) {
+          perfectBonus = 50;
+          spawnFloatingText('PERFECT!', landX, landY - 24, '#00e8d8');
+          spawnFloatingText('+50 PTS', landX, landY - 12, '#ffe600');
+        }
+
+        // FEVER中は基礎得点2倍
+        const baseScore = closestPeg.points * (isFever ? feverMultiplier : 1);
+        score += (baseScore + perfectBonus);
+
         if (!isTimeAttack) {
           sound.pegSink();
         }
-        screenShake = Math.min(8, 3 + comboCount * 2);
+        screenShake = Math.max(screenShake, Math.min(8, 3 + comboCount * 2));
         spawnExplosionParticles(closestPeg.x, closestPeg.y - 8, 16 + comboCount * 4);
         sound.ringHitPeg();
 
@@ -1309,26 +1341,25 @@
         let comboBonusPoints = 0;
 
         if (closestPeg.points >= 100) {
-          screenShake = 10;
-          spawnFloatingText('100 PTS GET!', closestPeg.x, closestPeg.y - 28, '#ffe600');
+          spawnFloatingText('100 PTS GET!', closestPeg.x, closestPeg.y - 36, '#ffe600');
         }
 
         if (comboCount >= 2) {
           addedRings = isTimeAttack ? 0 : 1;
-          comboBonusPoints = comboCount * 30;
+          comboBonusPoints = comboCount * 30 * (isFever ? feverMultiplier : 1);
           score += comboBonusPoints;
 
           setTimeout(() => {
             sound.comboSound(comboCount);
             spawnFloatingText(`COMBO x${comboCount}!`, landX, landY - 22, '#ff4444');
-            spawnFloatingText(`+${closestPeg.points + comboBonusPoints} PTS`, landX, landY - 10, '#ffcc00');
+            spawnFloatingText(`+${baseScore + comboBonusPoints} PTS`, landX, landY - 10, '#ffcc00');
             if (!isTimeAttack) {
               spawnFloatingText(`+${addedRings} RING!`, landX, landY + 2, '#00e8d8');
             }
           }, 80);
         } else {
           spawnFloatingText('NICE IN!', closestPeg.x, closestPeg.y - 16, '#00e8d8');
-          spawnFloatingText(`+${closestPeg.points} PTS`, closestPeg.x, closestPeg.y - 6, '#ffcc00');
+          spawnFloatingText(`+${baseScore} PTS`, closestPeg.x, closestPeg.y - 6, '#ffcc00');
         }
 
         if (!isTimeAttack) {
@@ -1356,6 +1387,11 @@
     }
 
     function handleMiss(x, y, text) {
+      if (isFever) {
+        isFever = false;
+        feverMultiplier = 1;
+        spawnFloatingText('FEVER END...', 128, 48, '#888888');
+      }
       comboCount = 0;
       if (ring) {
         ring.state = 'done';
@@ -1368,7 +1404,7 @@
     }
 
     function scheduleNextTurn() {
-      const waitTime = isTimeAttack ? 250 : 700; // タイムアタックはテンポよく
+      const waitTime = isTimeAttack ? 250 : 700;
       setTimeout(() => {
         if (!isTimeAttack && remainingRings <= 0) {
           showGameOver();
@@ -1382,7 +1418,6 @@
       }, waitTime);
     }
 
-    // タイムアタック用のビンゴ判定（ビンゴ成立時にボーナス加算＆再ビンゴ可能にクリア）
     function checkTaBingoCompletion() {
       let newBingos = 0;
       BINGO_LINES.forEach((line, idx) => {
@@ -1395,7 +1430,7 @@
       });
 
       if (newBingos > 0) {
-        const totalBonus = newBingos * 200;
+        const totalBonus = newBingos * 200 * (isFever ? feverMultiplier : 1);
         score += totalBonus;
         screenShake = 12;
         sound.bingoFanfare(bingosAchieved);
@@ -1405,7 +1440,6 @@
           spawnFloatingText(`+${totalBonus} PTS!`, 128, 70, '#ff9900');
         }, 120);
 
-        // 全ライン成立するか5ビンゴ以上でビンゴ状態をリフレッシュ
         if (completedBingoIndices.size >= 5) {
           completedBingoIndices.clear();
           PEGS.forEach(p => p.occupied = false);
@@ -1603,6 +1637,13 @@
         meterState = 'AIM_POWER';
         power = 0.0;
         powerDirection = 1;
+
+        // 横位置が各列（左・中・右）の中心に近いか判定
+        // 列の基準: 左(約0.14), 中央(約0.50), 右(約0.86)
+        const targetPegCol = Math.round(aimX * 2);
+        const idealAimX = targetPegCol === 0 ? 0.14 : (targetPegCol === 1 ? 0.50 : 0.86);
+        perfectAimX = Math.abs(aimX - idealAimX) <= 0.04;
+
         sound.playTone(440, 0.06, 'square', 0.15);
         updateMeterUI();
       } else if (meterState === 'AIM_POWER') {
@@ -1617,17 +1658,24 @@
 
         let targetRow = null;
         let isZoneHit = false;
+        let zoneCenter = 0;
 
         if (power >= powerZones.front.start && power <= (powerZones.front.start + powerZones.front.width)) {
           targetRow = powerZones.front.targetRow;
           isZoneHit = true;
+          zoneCenter = powerZones.front.start + powerZones.front.width / 2;
         } else if (power >= powerZones.mid.start && power <= (powerZones.mid.start + powerZones.mid.width)) {
           targetRow = powerZones.mid.targetRow;
           isZoneHit = true;
+          zoneCenter = powerZones.mid.start + powerZones.mid.width / 2;
         } else if (power >= powerZones.back.start && power <= (powerZones.back.start + powerZones.back.width)) {
           targetRow = powerZones.back.targetRow;
           isZoneHit = true;
+          zoneCenter = powerZones.back.start + powerZones.back.width / 2;
         }
+
+        // 強さゾーンの中心近くで止められたか判定
+        perfectPower = isZoneHit && (Math.abs(power - zoneCenter) <= 0.025);
 
         let targetY;
         if (targetRow === 2) targetY = 84;
@@ -1694,6 +1742,10 @@
       isTimeAttack = timeAttackMode;
       timeRemaining = 60.0;
       isSpeedBgm = false;
+      isFever = false;
+      feverMultiplier = 1;
+      perfectAimX = false;
+      perfectPower = false;
       sound.resetTempo();
 
       score = 0;
@@ -1765,6 +1817,8 @@
         return;
       }
       gameState = 'GAMEOVER';
+      isFever = false;
+      feverMultiplier = 1;
       sound.stopBgm();
       sound.resetTempo();
 
@@ -1840,8 +1894,7 @@
           const cx2 = 185, cy2 = 18;
           for (let a = 0; a < Math.PI * 2; a += Math.PI / 5) {
             const px = cx2 + Math.cos(a) * fRadius;
-            const py = cy2 + Math.sin(a) * fRadius;
-            drawPixelRect(px, py, 2, 2, '#38bdf8');
+            drawPixelRect(px, py = cy2 + Math.sin(a) * fRadius, 2, 2, '#38bdf8');
             drawPixelRect(cx2 + Math.cos(a) * (fRadius * 0.5), cy2 + Math.sin(a) * (fRadius * 0.5), 1, 1, '#fef08a');
           }
         }
@@ -2107,6 +2160,20 @@
       });
 
       renderHUD();
+
+      // FEVER中の画面外枠点滅演出
+      if (isFever) {
+        const t = performance.now() * 0.01;
+        ctx.strokeStyle = Math.sin(t) > 0 ? '#ffe600' : '#ff0055';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(2, 2, CANVAS_WIDTH - 4, CANVAS_HEIGHT - 4);
+
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = '#ff0055';
+        ctx.textAlign = 'right';
+        ctx.fillText('FEVER x2!', CANVAS_WIDTH - 6, 32);
+      }
+
       ctx.restore();
     }
 
@@ -2358,7 +2425,7 @@
     }
 
     /* ==========================================================================
-       5. イベントハンドラ & タッチ最適化
+       5. イベントハンドラ & UI連動
        ========================================================================== */
     const actionBtn = document.getElementById('actionBtn');
     const restartBtn = document.getElementById('restartBtn');
@@ -2453,8 +2520,9 @@
     });
 
     function triggerAction(e) {
-      if (e && e.cancelable && e.type === 'touchstart') {
+      if (e) {
         e.preventDefault();
+        e.stopPropagation();
       }
       window.focus();
       sound.init();
@@ -2482,12 +2550,11 @@
       triggerAction(e);
     });
 
-    gameWrapper.addEventListener('touchstart', (e) => {
+    gameWrapper.addEventListener('click', (e) => {
       if (gameState === 'PLAYING' && document.getElementById('gameModal').classList.contains('hidden') && prizeModal.classList.contains('hidden')) {
-        e.preventDefault();
         triggerAction(e);
       }
-    }, { passive: false });
+    });
 
     attachTap(restartBtn, () => initGame(isTimeAttack));
     attachTap(closePrizeBtn, () => prizeModal.classList.add('hidden'));
