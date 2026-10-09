@@ -2476,21 +2476,11 @@
       handleAction();
     }
 
-    let isTouchHandled = false;
-
-    actionBtn.addEventListener('touchstart', (e) => {
-      e.preventDefault(); // スクロールやズームの遅延を完全にカット
-      isTouchHandled = true;
+    actionBtn.addEventListener('click', triggerAction);
+    actionBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
       triggerAction(e);
-    }, { passive: false });
-
-    actionBtn.addEventListener('click', (e) => {
-      if (isTouchHandled) {
-        isTouchHandled = false; // スマホでの二重反応を防ぐ
-        return;
-        }
-        triggerAction(e);
-      });
+    });
 
     gameWrapper.addEventListener('touchstart', (e) => {
       if (gameState === 'PLAYING' && document.getElementById('gameModal').classList.contains('hidden') && prizeModal.classList.contains('hidden')) {
