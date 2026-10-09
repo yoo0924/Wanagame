@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ファミコン風2D輪投げ (RETRO WANAGE FC '83)</title>
+  <title>WANAGAME</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
@@ -26,15 +26,7 @@
       box-shadow: inset 0 0 35px rgba(0,0,0,0.9), 0 0 15px rgba(0,0,0,0.8);
     }
     .crt-screen::before {
-      content: " ";
-      display: block;
-      position: absolute;
-      top: 0; left: 0; bottom: 0; right: 0;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
-                  linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 255, 0, 0.03));
-      z-index: 20;
-      background-size: 100% 3px, 3px 100%;
-      pointer-events: none;
+      display: none;
     }
     canvas {
       image-rendering: pixelated;
@@ -78,6 +70,7 @@
     }
     .menu-item {
       transition: all 0.15s ease;
+      cursor: pointer;
     }
     .menu-item.active {
       color: #facc15;
@@ -117,12 +110,19 @@
       
       <canvas id="gameCanvas" width="256" height="224"></canvas>
 
+      <!-- カウントダウンオーバーレイ -->
+      <div id="countdownOverlay" class="hidden absolute inset-0 bg-black/75 flex flex-col items-center justify-center z-50 pointer-events-none select-none">
+        <div id="countdownText" class="text-5xl sm:text-6xl text-yellow-400 font-bold tracking-widest drop-shadow-[4px_4px_0_#991b1b] animate-bounce">
+          3
+        </div>
+      </div>
+
       <!-- タイトル画面 -->
       <div id="titleScreen" class="absolute inset-0 bg-black/95 flex flex-col items-center justify-between p-3.5 z-40 text-center select-none overflow-y-auto">
         <div class="mt-1 flex flex-col items-center">
           <p class="text-[9px] text-red-500 tracking-widest font-bold mb-1 animate-pulse">★ NINTEN-FESTIVAL 1983 ★</p>
           <h2 class="text-sm sm:text-lg text-yellow-400 font-extrabold tracking-widest leading-relaxed drop-shadow-[2px_2px_0_#991b1b]">
-            元祖 縁日輪投げ
+            WANAGAME
           </h2>
           <div class="text-[8px] text-zinc-400 mt-0.5">WANAGE RETRO FC EDITION</div>
         </div>
@@ -135,39 +135,66 @@
         </div>
 
         <div class="flex flex-col gap-1.5 my-auto w-64 text-[10px] sm:text-xs">
-          <div id="menuOpt0" class="menu-item active flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60">
+          <div id="menuOpt0" class="menu-item active flex items-center justify-start px-3 py-1.5 rounded hover:bg-zinc-800/60">
             <span class="cursor-icon mr-2 text-yellow-400">▶</span>
-            <span>1. ゲームスタート</span>
+            <span>1. 通常スタート</span>
           </div>
-          <div id="menuOpt1" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60">
+          <div id="menuOpt1" class="menu-item flex items-center justify-start px-3 py-1.5 rounded hover:bg-zinc-800/60 text-amber-400 font-bold">
             <span class="cursor-icon mr-2 opacity-0">▶</span>
-            <span>2. あそびかた</span>
+            <span>2. タイムアタック (60s)</span>
           </div>
-          <div id="menuOpt2" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60">
+          <div id="menuOpt2" class="menu-item flex items-center justify-start px-3 py-1.5 rounded hover:bg-zinc-800/60">
             <span class="cursor-icon mr-2 opacity-0">▶</span>
-            <span>3. 景品帳 (コレクション)</span>
+            <span>3. あそびかた</span>
           </div>
-          <div id="menuOpt3" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60">
+          <div id="menuOpt3" class="menu-item flex items-center justify-start px-3 py-1.5 rounded hover:bg-zinc-800/60">
             <span class="cursor-icon mr-2 opacity-0">▶</span>
-            <span id="menuSoundLabel">4. サウンド: ON</span>
+            <span>4. 景品帳 (コレクション)</span>
           </div>
-          <div id="menuOpt4" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60 text-amber-300">
+          <div id="menuOpt4" class="menu-item flex items-center justify-start px-3 py-1.5 rounded hover:bg-zinc-800/60">
             <span class="cursor-icon mr-2 opacity-0">▶</span>
-            <span>5. 縁日ガラポン抽選 (ガチャ)</span>
+            <span id="menuSoundLabel">5. サウンド: ON</span>
           </div>
-          <div id="menuOpt5" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60 text-emerald-300">
+          <div id="menuOpt5" class="menu-item flex items-center justify-start px-3 py-1.5 rounded hover:bg-zinc-800/60 text-amber-300">
             <span class="cursor-icon mr-2 opacity-0">▶</span>
-            <span>6. 装飾カスタム (きせかえ)</span>
+            <span>6. 縁日ガラポン (ガチャ)</span>
           </div>
-          <div id="menuOpt6" class="menu-item flex items-center justify-start px-3 py-1.5 rounded cursor-pointer hover:bg-zinc-800/60 text-cyan-300">
+          <div id="menuOpt6" class="menu-item flex items-center justify-start px-3 py-1.5 rounded hover:bg-zinc-800/60 text-emerald-300">
             <span class="cursor-icon mr-2 opacity-0">▶</span>
-            <span>7. オンラインランキング</span>
+            <span>7. 装飾カスタム (きせかえ)</span>
+          </div>
+          <div id="menuOpt7" class="menu-item flex items-center justify-start px-3 py-1.5 rounded hover:bg-zinc-800/60 text-cyan-300">
+            <span class="cursor-icon mr-2 opacity-0">▶</span>
+            <span>8. オンラインランキング</span>
           </div>
         </div>
 
         <div class="mb-1 text-[8px] text-zinc-400 space-y-1">
           <p class="text-yellow-300">所持ポイント: <span id="titlePt" class="font-bold text-amber-400">0</span> PT</p>
           <p class="text-zinc-500">▲▼: えらぶ / [A] / [SPACE]: 決定</p>
+        </div>
+      </div>
+
+      <!-- タイムアタック確認モーダル -->
+      <div id="taConfirmModal" class="hidden absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 z-50 text-center select-none">
+        <div class="w-full max-w-xs bg-zinc-900 border-2 border-amber-500 rounded-xl p-4 shadow-2xl flex flex-col items-center gap-3">
+          <div class="text-[12px] text-amber-400 font-bold tracking-wider">【 タイムアタック挑戦 】</div>
+          <p class="text-[9px] text-zinc-200 leading-relaxed font-bold">
+            じゅんびは いい？
+          </p>
+          <div class="text-[8px] text-zinc-400 text-left bg-black/60 p-2 rounded border border-zinc-800 space-y-1 w-full">
+            <p>・せいげん時間: 60秒</p>
+            <p>・棒はひっこまず、何回でも入る！</p>
+            <p>・コンボ＆ビンゴでハイスコアを狙え！</p>
+          </div>
+          <div class="flex gap-2 w-full mt-1">
+            <button id="cancelTaBtn" class="flex-1 py-2 bg-zinc-800 border border-zinc-600 text-zinc-300 rounded text-[9px] hover:bg-zinc-700 active:scale-95">
+              もどる
+            </button>
+            <button id="confirmTaBtn" class="flex-1 py-2 fc-btn-gold rounded text-[9px] font-bold">
+              OK！
+            </button>
+          </div>
         </div>
       </div>
 
@@ -275,14 +302,14 @@
           <p><span class="text-yellow-400 font-bold">1. 二段階目押しシステム:</span><br>
           ・Aボタン(SPACE)でまず「横位置」を決定。<br>
           ・次に往復する「つよさゲージ」を、手前(青)・中央(黄)・奥(赤)の狙いたい列で止めます。黒い部分はハズレです！</p>
-          <p><span class="text-cyan-400 font-bold">2. 輪の増加とボーナス:</span><br>
-          ・入った棒は床下へ沈み、二度と入りません。<br>
-          ・輪は通常では増えず、<strong class="text-pink-400">2連続以上のコンボ</strong>や<strong class="text-yellow-300">ビンゴ成立</strong>でのみ補充されます！</p>
-          <p><span class="text-emerald-400 font-bold">3. 9本制覇とラインバトル:</span><br>
-          ・9本全て沈めるとジャックポット(+1000点 & 輪+5個)！<br>
-          ・その後は手前列・中央列・奥列が1列(3本)ずつ出現するエンドレスラインバトルに突入します。</p>
-          <p><span class="text-amber-400 font-bold">4. ガチャポイント獲得:</span><br>
-          ・ゲーム終了時のスコアの<strong class="text-yellow-300">10%が福引ポイント</strong>として付与されます。たくさん貯めてガラポンを回そう！</p>
+          <p><span class="text-cyan-400 font-bold">2. 通常モードと輪の増加:</span><br>
+          ・通常モードでは入った棒は床下へ沈み、二度と入りません。<br>
+          ・輪は2連続以上のコンボやビンゴ成立でのみ補充されます！</p>
+          <p><span class="text-amber-400 font-bold">3. タイムアタックモード:</span><br>
+          ・制限時間60秒！輪は無限に投げられます。<br>
+          ・棒は沈まず同じ棒に何回入ってもOK！コンボとビンゴでハイスコアを競おう！残り10秒はBGMが超加速！</p>
+          <p><span class="text-emerald-400 font-bold">4. ガチャポイント獲得:</span><br>
+          ・ゲーム終了時のスコアの10%が福引ポイントとして付与されます。</p>
         </div>
         <button id="closeHowToBtn" class="fc-btn px-6 py-2 rounded text-xs self-center mt-2">
           もどる
@@ -298,13 +325,14 @@
         </div>
 
         <div class="bg-zinc-900 border-2 border-yellow-500 rounded p-2.5 mb-2 text-[10px] sm:text-xs space-y-1.5 w-64 sm:w-72 text-left">
+          <p class="flex justify-between text-zinc-300"><span>MODE:</span><span id="finalMode" class="text-cyan-300 font-bold">通常モード</span></p>
           <p class="flex justify-between text-zinc-300"><span>FINAL SCORE:</span><span id="finalScore" class="text-yellow-400 font-bold">0</span></p>
           <p class="flex justify-between text-zinc-300"><span>EARNED POINTS:</span><span id="earnedPt" class="text-amber-300 font-bold">+0 PT</span></p>
           <p class="flex justify-between text-zinc-300"><span>HI-SCORE:</span><span id="finalHiScore" class="text-white">0</span></p>
-          <p class="flex justify-between text-zinc-300"><span>REACHED ROUND:</span><span id="finalRound" class="text-emerald-400">1</span></p>
           <p class="flex justify-between text-zinc-300"><span>TOTAL BINGOS:</span><span id="finalBingos" class="text-cyan-400">0</span></p>
           <p class="flex justify-between text-zinc-300"><span>MAX COMBO:</span><span id="finalCombo" class="text-pink-400">0</span></p>
-          <p class="flex justify-between text-zinc-300"><span>LINES CLEARED:</span><span id="finalLines" class="text-amber-400">0</span></p>
+          <p id="finalRoundRow" class="flex justify-between text-zinc-300"><span>REACHED ROUND:</span><span id="finalRound" class="text-emerald-400">1</span></p>
+          <p id="finalLinesRow" class="flex justify-between text-zinc-300"><span>LINES CLEARED:</span><span id="finalLines" class="text-amber-400">0</span></p>
         </div>
 
         <div class="flex gap-2 w-64 sm:w-72">
@@ -338,13 +366,16 @@
           </button>
         </div>
 
-        <!-- タブ切り替え -->
-        <div class="flex gap-2 w-full max-w-xs mt-2">
-          <button id="tabScoreRank" class="flex-1 py-1.5 text-[9px] rounded font-bold border border-yellow-400 bg-yellow-950/60 text-yellow-300">
-            最高スコア
+        <!-- タブ切り替え (タイムアタック追加) -->
+        <div class="flex gap-1.5 w-full max-w-xs mt-2">
+          <button id="tabScoreRank" class="flex-1 py-1.5 text-[8px] sm:text-[9px] rounded font-bold border border-yellow-400 bg-yellow-950/60 text-yellow-300">
+            通常
           </button>
-          <button id="tabItemRank" class="flex-1 py-1.5 text-[9px] rounded font-bold border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200">
-            所持アイテム
+          <button id="tabTimeRank" class="flex-1 py-1.5 text-[8px] sm:text-[9px] rounded font-bold border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200">
+            タイムアタック
+          </button>
+          <button id="tabItemRank" class="flex-1 py-1.5 text-[8px] sm:text-[9px] rounded font-bold border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200">
+            アイテム
           </button>
         </div>
 
@@ -378,7 +409,7 @@
           <span id="windDisplay" class="text-cyan-300 font-bold">無風 (0m)</span>
         </div>
         <div class="flex items-center gap-1.5">
-          <span class="text-emerald-400 font-bold">ROUND:</span>
+          <span id="roundOrTimeLabel" class="text-emerald-400 font-bold">ROUND:</span>
           <span id="roundDisplay" class="text-yellow-300 font-bold">1 (通常)</span>
         </div>
       </div>
@@ -424,7 +455,6 @@
     /* ==========================================================================
        0. オンライン連携設定 (Google Apps Script)
        ========================================================================== */
-    // ※ デプロイして取得した Web アプリ URL に書き換えてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzazrJ7j6LtzFz7wAF8KjnvWA3P7U-vPQfzeY65wC_sXh21DlGUDy_Ll_foX4dCda-P/exec";
 
     /* ==========================================================================
@@ -438,6 +468,7 @@
         this.bgmTimer = null;
         this.bgmStep = 0;
         this.isBgmPlaying = false;
+        this.defaultTempo = 138;
         this.bgmTempo = 138;
       }
 
@@ -449,6 +480,14 @@
         if (this.ctx && this.ctx.state === 'suspended') {
           this.ctx.resume();
         }
+      }
+
+      setTempo(bpm) {
+        this.bgmTempo = bpm;
+      }
+
+      resetTempo() {
+        this.bgmTempo = this.defaultTempo;
       }
 
       startBgm() {
@@ -786,6 +825,7 @@
           playerName,
           userPoints,
           hiScore,
+          hiScoreTa,
           currentCustom,
           ownedItems,
           unlockedPrizes
@@ -808,6 +848,7 @@
         if (data.playerName) playerName = data.playerName;
         if (typeof data.userPoints === 'number') userPoints = data.userPoints;
         if (typeof data.hiScore === 'number') hiScore = data.hiScore;
+        if (typeof data.hiScoreTa === 'number') hiScoreTa = data.hiScoreTa;
         if (data.currentCustom) currentCustom = { ...currentCustom, ...data.currentCustom };
 
         if (Array.isArray(data.ownedItems)) {
@@ -833,7 +874,7 @@
     }
 
     // --- オンラインランキング送信 ---
-    async function sendScoreToOnline(finalScore) {
+    async function sendScoreToOnline(finalScore, mode = 'score') {
       if (!GAS_API_URL || GAS_API_URL.includes("ここにデプロイした")) return;
       const currentOwnedCount = GACHA_ITEMS.filter(it => it.owned).length;
       try {
@@ -842,7 +883,8 @@
           body: JSON.stringify({
             name: playerName,
             score: finalScore,
-            items: currentOwnedCount
+            items: currentOwnedCount,
+            mode: mode
           })
         });
       } catch (err) {
@@ -884,6 +926,7 @@
       const tbody = document.getElementById('rankingTableBody');
       const headerVal = document.getElementById('rankValueHeader');
       const tabScore = document.getElementById('tabScoreRank');
+      const tabTime = document.getElementById('tabTimeRank');
       const tabItem = document.getElementById('tabItemRank');
 
       tbody.innerHTML = `
@@ -894,14 +937,19 @@
         </tr>
       `;
 
+      tabScore.className = 'flex-1 py-1.5 text-[8px] sm:text-[9px] rounded font-bold border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200';
+      tabTime.className = 'flex-1 py-1.5 text-[8px] sm:text-[9px] rounded font-bold border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200';
+      tabItem.className = 'flex-1 py-1.5 text-[8px] sm:text-[9px] rounded font-bold border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200';
+
       if (currentRankingTab === 'score') {
         headerVal.textContent = 'スコア';
-        tabScore.className = 'flex-1 py-1.5 text-[9px] rounded font-bold border border-yellow-400 bg-yellow-950/60 text-yellow-300';
-        tabItem.className = 'flex-1 py-1.5 text-[9px] rounded font-bold border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200';
+        tabScore.className = 'flex-1 py-1.5 text-[8px] sm:text-[9px] rounded font-bold border border-yellow-400 bg-yellow-950/60 text-yellow-300';
+      } else if (currentRankingTab === 'time') {
+        headerVal.textContent = 'スコア';
+        tabTime.className = 'flex-1 py-1.5 text-[8px] sm:text-[9px] rounded font-bold border border-amber-400 bg-amber-950/60 text-amber-300';
       } else {
         headerVal.textContent = 'アイテム';
-        tabItem.className = 'flex-1 py-1.5 text-[9px] rounded font-bold border border-emerald-400 bg-emerald-950/60 text-emerald-300';
-        tabScore.className = 'flex-1 py-1.5 text-[9px] rounded font-bold border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200';
+        tabItem.className = 'flex-1 py-1.5 text-[8px] sm:text-[9px] rounded font-bold border border-emerald-400 bg-emerald-950/60 text-emerald-300';
       }
 
       if (!GAS_API_URL || GAS_API_URL.includes("ここにデプロイした")) {
@@ -941,7 +989,12 @@
         else if (index === 1) rankColor = 'text-slate-300 font-bold';
         else if (index === 2) rankColor = 'text-amber-500 font-bold';
 
-        const valText = currentRankingTab === 'score' ? `${item.score}点` : `${item.items} / ${GACHA_ITEMS.length}種`;
+        let valText;
+        if (currentRankingTab === 'item') {
+          valText = `${item.items} / ${GACHA_ITEMS.length}種`;
+        } else {
+          valText = `${item.score}点`;
+        }
 
         tr.innerHTML = `
           <td class="py-1.5 ${rankColor}">${index + 1}位</td>
@@ -954,10 +1007,11 @@
 
     /* ==========================================================================
        4. ゲームプレイロジック
-       ========================================================================= */
+       ========================================================================== */
     const TOTAL_RINGS = 6;
     let score = 0;
     let hiScore = 3000;
+    let hiScoreTa = 0;
     let remainingRings = TOTAL_RINGS;
     let bingosAchieved = 0;
     let comboCount = 0;
@@ -969,9 +1023,14 @@
     let endlessLineMode = false;
     let currentEndlessRow = 0;
 
+    // ゲームモードフラグ
+    let isTimeAttack = false;
+    let timeRemaining = 60.0;
+    let isSpeedBgm = false;
+
     let gameState = 'TITLE';
     let selectedMenuIndex = 0;
-    const MENU_COUNT = 7;
+    const MENU_COUNT = 8; // タイムアタック追加に伴い 7 -> 8
 
     let windSpeed = 0;
     let meterState = 'AIM_X';
@@ -999,9 +1058,13 @@
     const meterGuideText = document.getElementById('meterGuideText');
     const windDisplay = document.getElementById('windDisplay');
     const roundDisplay = document.getElementById('roundDisplay');
+    const roundOrTimeLabel = document.getElementById('roundOrTimeLabel');
     const headerPt = document.getElementById('headerPt');
     const titlePt = document.getElementById('titlePt');
     const gachaPt = document.getElementById('gachaPt');
+    const countdownOverlay = document.getElementById('countdownOverlay');
+    const countdownText = document.getElementById('countdownText');
+    const taConfirmModal = document.getElementById('taConfirmModal');
 
     function updatePointsDisplay() {
       headerPt.textContent = userPoints;
@@ -1016,7 +1079,7 @@
     }
 
     function generatePowerZones() {
-      const roundTighten = Math.min(0.04, (currentRound - 1) * 0.01);
+      const roundTighten = isTimeAttack ? 0.02 : Math.min(0.04, (currentRound - 1) * 0.01);
       const wFront = Math.max(0.12, 0.18 - roundTighten);
       const wMid   = Math.max(0.08, 0.11 - roundTighten * 0.7);
       const wBack  = Math.max(0.04, 0.06 - roundTighten * 0.5);
@@ -1046,7 +1109,7 @@
       zoneBackEl.style.left = `${(startBack * 100).toFixed(1)}%`;
       zoneBackEl.style.width = `${(wBack * 100).toFixed(1)}%`;
 
-      if (currentRound >= 2) {
+      if (!isTimeAttack && currentRound >= 2) {
         windSpeed = Math.floor(Math.random() * 5) - 2;
       } else {
         windSpeed = 0;
@@ -1066,11 +1129,26 @@
         windDisplay.className = 'text-amber-400 font-bold animate-pulse';
       }
 
-      if (!endlessLineMode) {
-        roundDisplay.textContent = `${currentRound} (通常)`;
+      if (isTimeAttack) {
+        roundOrTimeLabel.textContent = 'TIME:';
+        roundOrTimeLabel.className = 'text-amber-400 font-bold';
+        const sec = Math.max(0, Math.ceil(timeRemaining));
+        roundDisplay.textContent = `${sec}s`;
+        if (sec <= 10) {
+          roundDisplay.className = 'text-red-500 font-bold animate-pulse';
+        } else {
+          roundDisplay.className = 'text-yellow-300 font-bold';
+        }
       } else {
-        const rowName = currentEndlessRow === 0 ? '手前列' : (currentEndlessRow === 1 ? '中央列' : '奥列');
-        roundDisplay.textContent = `${currentRound} (LINE: ${rowName})`;
+        roundOrTimeLabel.textContent = 'ROUND:';
+        roundOrTimeLabel.className = 'text-emerald-400 font-bold';
+        if (!endlessLineMode) {
+          roundDisplay.textContent = `${currentRound} (通常)`;
+        } else {
+          const rowName = currentEndlessRow === 0 ? '手前列' : (currentEndlessRow === 1 ? '中央列' : '奥列');
+          roundDisplay.textContent = `${currentRound} (LINE: ${rowName})`;
+        }
+        roundDisplay.className = 'text-yellow-300 font-bold';
       }
     }
 
@@ -1087,7 +1165,23 @@
     }
 
     function update(dt) {
-      const speedMultiplier = 1.0 + Math.min(0.6, (currentRound - 1) * 0.15);
+      // タイムアタックカウントダウン
+      if (gameState === 'PLAYING' && isTimeAttack) {
+        timeRemaining -= dt;
+        if (timeRemaining <= 10 && !isSpeedBgm) {
+          isSpeedBgm = true;
+          sound.setTempo(190); // 残り10秒でBGM加速
+        }
+        if (timeRemaining <= 0) {
+          timeRemaining = 0;
+          updateEnvironmentUI();
+          showGameOver();
+          return;
+        }
+        updateEnvironmentUI();
+      }
+
+      const speedMultiplier = isTimeAttack ? 1.25 : (1.0 + Math.min(0.6, (currentRound - 1) * 0.15));
 
       if (meterState === 'AIM_X') {
         const aimSpeed = 1.65 * speedMultiplier;
@@ -1104,10 +1198,14 @@
       }
 
       PEGS.forEach(peg => {
-        if (peg.occupied && peg.sinkProgress < 1.0) {
-          peg.sinkProgress = Math.min(1.0, peg.sinkProgress + dt * 3.5);
-        } else if (!peg.occupied && peg.activeInLine && peg.sinkProgress > 0.0) {
-          peg.sinkProgress = Math.max(0.0, peg.sinkProgress - dt * 3.8);
+        if (!isTimeAttack) {
+          if (peg.occupied && peg.sinkProgress < 1.0) {
+            peg.sinkProgress = Math.min(1.0, peg.sinkProgress + dt * 3.5);
+          } else if (!peg.occupied && peg.activeInLine && peg.sinkProgress > 0.0) {
+            peg.sinkProgress = Math.max(0.0, peg.sinkProgress - dt * 3.8);
+          }
+        } else {
+          peg.sinkProgress = 0; // タイムアタックでは沈まない
         }
       });
 
@@ -1159,12 +1257,12 @@
         return;
       }
 
-      if (endlessLineMode && rObj.targetRow !== currentEndlessRow) {
+      if (!isTimeAttack && endlessLineMode && rObj.targetRow !== currentEndlessRow) {
         handleMiss(landX, landY, 'WRONG ROW!');
         return;
       }
 
-      const candidatePegs = PEGS.filter(p => p.row === rObj.targetRow && p.activeInLine);
+      const candidatePegs = PEGS.filter(p => p.row === rObj.targetRow && (isTimeAttack || p.activeInLine));
       let closestPeg = null;
       let minDx = 999;
       let minDy = 999;
@@ -1182,7 +1280,7 @@
       const isSevereHit = closestPeg && (minDx < 8.5) && (minDy < 8.0);
 
       if (isSevereHit) {
-        if (closestPeg.occupied) {
+        if (!isTimeAttack && closestPeg.occupied) {
           handleMiss(landX, landY, 'NO TARGET!');
           return;
         }
@@ -1199,7 +1297,9 @@
         if (comboCount > maxCombo) maxCombo = comboCount;
 
         score += closestPeg.points;
-        sound.pegSink();
+        if (!isTimeAttack) {
+          sound.pegSink();
+        }
         screenShake = Math.min(8, 3 + comboCount * 2);
         spawnExplosionParticles(closestPeg.x, closestPeg.y - 8, 16 + comboCount * 4);
         sound.ringHitPeg();
@@ -1213,7 +1313,7 @@
         }
 
         if (comboCount >= 2) {
-          addedRings = 1;
+          addedRings = isTimeAttack ? 0 : 1;
           comboBonusPoints = comboCount * 30;
           score += comboBonusPoints;
 
@@ -1221,19 +1321,24 @@
             sound.comboSound(comboCount);
             spawnFloatingText(`COMBO x${comboCount}!`, landX, landY - 22, '#ff4444');
             spawnFloatingText(`+${closestPeg.points + comboBonusPoints} PTS`, landX, landY - 10, '#ffcc00');
-            spawnFloatingText(`+${addedRings} RING!`, landX, landY + 2, '#00e8d8');
+            if (!isTimeAttack) {
+              spawnFloatingText(`+${addedRings} RING!`, landX, landY + 2, '#00e8d8');
+            }
           }, 80);
         } else {
           spawnFloatingText('NICE IN!', closestPeg.x, closestPeg.y - 16, '#00e8d8');
           spawnFloatingText(`+${closestPeg.points} PTS`, closestPeg.x, closestPeg.y - 6, '#ffcc00');
         }
 
-        remainingRings += addedRings;
-
-        if (endlessLineMode) {
-          checkEndlessLineCompletion();
+        if (!isTimeAttack) {
+          remainingRings += addedRings;
+          if (endlessLineMode) {
+            checkEndlessLineCompletion();
+          } else {
+            checkNormalRoundCompletion();
+          }
         } else {
-          checkNormalRoundCompletion();
+          checkTaBingoCompletion();
         }
 
         checkPrizeUnlocks();
@@ -1262,15 +1367,49 @@
     }
 
     function scheduleNextTurn() {
+      const waitTime = isTimeAttack ? 250 : 700; // タイムアタックはテンポよく
       setTimeout(() => {
-        if (remainingRings <= 0) {
+        if (!isTimeAttack && remainingRings <= 0) {
+          showGameOver();
+        } else if (isTimeAttack && timeRemaining <= 0) {
           showGameOver();
         } else {
           meterState = 'AIM_X';
           generatePowerZones();
           updateMeterUI();
         }
-      }, 700);
+      }, waitTime);
+    }
+
+    // タイムアタック用のビンゴ判定（ビンゴ成立時にボーナス加算＆再ビンゴ可能にクリア）
+    function checkTaBingoCompletion() {
+      let newBingos = 0;
+      BINGO_LINES.forEach((line, idx) => {
+        const isComplete = line.every(pegId => PEGS[pegId].occupied);
+        if (isComplete && !completedBingoIndices.has(idx)) {
+          completedBingoIndices.add(idx);
+          newBingos++;
+          bingosAchieved++;
+        }
+      });
+
+      if (newBingos > 0) {
+        const totalBonus = newBingos * 200;
+        score += totalBonus;
+        screenShake = 12;
+        sound.bingoFanfare(bingosAchieved);
+
+        setTimeout(() => {
+          spawnFloatingText('★ BINGO!! ★', 128, 56, '#ffe600');
+          spawnFloatingText(`+${totalBonus} PTS!`, 128, 70, '#ff9900');
+        }, 120);
+
+        // 全ライン成立するか5ビンゴ以上でビンゴ状態をリフレッシュ
+        if (completedBingoIndices.size >= 5) {
+          completedBingoIndices.clear();
+          PEGS.forEach(p => p.occupied = false);
+        }
+      }
     }
 
     function checkNormalRoundCompletion() {
@@ -1421,9 +1560,9 @@
           if (pz.reqScore && score >= pz.reqScore) cond = true;
           if (pz.reqCombo && maxCombo >= pz.reqCombo) cond = true;
           if (pz.reqBingos && bingosAchieved >= pz.reqBingos) cond = true;
-          if (pz.reqAllClear && allClearCount >= pz.reqAllClear) cond = true;
-          if (pz.reqLines && linesClearedTotal >= pz.reqLines) cond = true;
-          if (pz.reqRound && currentRound >= pz.reqRound) cond = true;
+          if (!isTimeAttack && pz.reqAllClear && allClearCount >= pz.reqAllClear) cond = true;
+          if (!isTimeAttack && pz.reqLines && linesClearedTotal >= pz.reqLines) cond = true;
+          if (!isTimeAttack && pz.reqRound && currentRound >= pz.reqRound) cond = true;
 
           if (cond) {
             pz.unlocked = true;
@@ -1467,7 +1606,9 @@
         updateMeterUI();
       } else if (meterState === 'AIM_POWER') {
         meterState = 'THROWING';
-        remainingRings--;
+        if (!isTimeAttack) {
+          remainingRings--;
+        }
         sound.playTone(550, 0.08, 'square', 0.18);
         sound.throwWhoosh();
 
@@ -1505,7 +1646,7 @@
           x: targetX,
           y: 198,
           progress: 0,
-          duration: 0.56,
+          duration: isTimeAttack ? 0.38 : 0.56,
           maxArc: 55,
           scale: 1.35,
           heightOffset: 0,
@@ -1532,8 +1673,10 @@
     }
 
     function updateHUD() {
-      if (score > hiScore) {
-        hiScore = score;
+      if (!isTimeAttack) {
+        if (score > hiScore) hiScore = score;
+      } else {
+        if (score > hiScoreTa) hiScoreTa = score;
       }
     }
 
@@ -1546,7 +1689,12 @@
       return '【素人】お祭りデビュー';
     }
 
-    function initGame() {
+    function initGame(timeAttackMode = false) {
+      isTimeAttack = timeAttackMode;
+      timeRemaining = 60.0;
+      isSpeedBgm = false;
+      sound.resetTempo();
+
       score = 0;
       remainingRings = TOTAL_RINGS;
       bingosAchieved = 0;
@@ -1585,23 +1733,62 @@
       sound.startBgm();
     }
 
+    function startTaCountdown() {
+      titleScreen.classList.add('hidden');
+      taConfirmModal.classList.add('hidden');
+      countdownOverlay.classList.remove('hidden');
+
+      let count = 3;
+      countdownText.textContent = '3';
+      sound.playTone(440, 0.12, 'square', 0.2);
+
+      const timer = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countdownText.textContent = count;
+          sound.playTone(440, 0.12, 'square', 0.2);
+        } else if (count === 0) {
+          countdownText.textContent = 'START!';
+          sound.playTone(880, 0.25, 'square', 0.25);
+        } else {
+          clearInterval(timer);
+          countdownOverlay.classList.add('hidden');
+          gameState = 'PLAYING';
+          initGame(true);
+        }
+      }, 900);
+    }
+
     function showGameOver() {
       sound.stopBgm();
+      sound.resetTempo();
 
       const earned = Math.floor(score * 0.1);
       addPoints(earned);
 
-      // オンラインランキングへスコア送信
-      sendScoreToOnline(score);
+      // オンラインランキング送信
+      sendScoreToOnline(score, isTimeAttack ? 'time' : 'score');
 
+      document.getElementById('finalMode').textContent = isTimeAttack ? 'タイムアタック (60s)' : '通常モード';
       document.getElementById('finalScore').textContent = score;
       document.getElementById('earnedPt').textContent = `+${earned} PT (所持: ${userPoints} PT)`;
-      document.getElementById('finalHiScore').textContent = hiScore;
-      document.getElementById('finalRound').textContent = currentRound;
+      document.getElementById('finalHiScore').textContent = isTimeAttack ? hiScoreTa : hiScore;
       document.getElementById('finalBingos').textContent = bingosAchieved;
       document.getElementById('finalCombo').textContent = maxCombo;
-      document.getElementById('finalLines').textContent = linesClearedTotal;
       document.getElementById('rankBadge').textContent = `RANK: ${calculateRank()}`;
+
+      const rRow = document.getElementById('finalRoundRow');
+      const lRow = document.getElementById('finalLinesRow');
+      if (isTimeAttack) {
+        rRow.classList.add('hidden');
+        lRow.classList.add('hidden');
+      } else {
+        rRow.classList.remove('hidden');
+        lRow.classList.remove('hidden');
+        document.getElementById('finalRound').textContent = currentRound;
+        document.getElementById('finalLines').textContent = linesClearedTotal;
+      }
+
       document.getElementById('gameModal').classList.remove('hidden');
     }
 
@@ -1865,7 +2052,7 @@
       ctx.moveTo(27, 126); ctx.lineTo(229, 126);
       ctx.stroke();
 
-      if (endlessLineMode) {
+      if (!isTimeAttack && endlessLineMode) {
         ctx.font = '7px "Press Start 2P", monospace';
         ctx.fillStyle = '#ffe600';
         ctx.textAlign = 'center';
@@ -1928,7 +2115,7 @@
       ctx.fill();
 
       const defaultHeight = 22;
-      const isVisibleRow = !endlessLineMode || peg.activeInLine;
+      const isVisibleRow = isTimeAttack || !endlessLineMode || peg.activeInLine;
       const currentHeight = isVisibleRow ? defaultHeight * (1.0 - (peg.sinkProgress || 0)) : 0;
 
       const pegConfig = GACHA_ITEMS.find(it => it.id === currentCustom.peg) || GACHA_ITEMS.find(it => it.id === 'peg_wood');
@@ -1958,17 +2145,17 @@
         ctx.fill();
       }
 
-      const isTargetLine = !endlessLineMode || peg.activeInLine;
+      const isTargetLine = isTimeAttack || !endlessLineMode || peg.activeInLine;
       drawPixelRect(px - 13, py + 3, 26, 9, '#000000');
-      drawPixelRect(px - 12, py + 4, 24, 7, peg.occupied ? '#fc9838' : (isTargetLine ? '#222233' : '#111116'));
+      drawPixelRect(px - 12, py + 4, 24, 7, (!isTimeAttack && peg.occupied) ? '#fc9838' : (isTargetLine ? '#222233' : '#111116'));
 
       ctx.font = '6px "Press Start 2P", monospace';
-      ctx.fillStyle = peg.occupied ? '#000000' : (isTargetLine ? '#fcfcfc' : '#555566');
+      ctx.fillStyle = (!isTimeAttack && peg.occupied) ? '#000000' : (isTargetLine ? '#fcfcfc' : '#555566');
       ctx.textAlign = 'center';
       ctx.fillText(peg.label, px, py + 10);
       ctx.textAlign = 'start';
 
-      if (peg.occupied) {
+      if (!isTimeAttack && peg.occupied) {
         const ringY = py - Math.max(2, currentHeight * 0.4);
         renderPixelRing(px, ringY, 0.85, 0);
       }
@@ -2013,12 +2200,20 @@
       ctx.fillStyle = '#ffe600';
       ctx.fillText(`${score}`, 48, 12);
 
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText('RING', 110, 12);
-      ctx.fillStyle = '#00e8d8';
-      let ringDots = '●'.repeat(Math.min(remainingRings, 6));
-      if (remainingRings > 6) ringDots += `+${remainingRings - 6}`;
-      ctx.fillText(ringDots, 146, 12);
+      if (!isTimeAttack) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('RING', 110, 12);
+        ctx.fillStyle = '#00e8d8';
+        let ringDots = '●'.repeat(Math.min(remainingRings, 6));
+        if (remainingRings > 6) ringDots += `+${remainingRings - 6}`;
+        ctx.fillText(ringDots, 146, 12);
+      } else {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('TIME', 110, 12);
+        const s = Math.max(0, Math.ceil(timeRemaining));
+        ctx.fillStyle = s <= 10 ? '#ff3333' : '#00e8d8';
+        ctx.fillText(`${s}s`, 146, 12);
+      }
 
       if (comboCount >= 2) {
         ctx.fillStyle = '#ff4444';
@@ -2102,9 +2297,7 @@
         rollBtn.classList.remove('opacity-50');
         renderCustomModal();
         saveGameToStorage();
-        
-        // アイテム数更新のためオンラインにも通知
-        sendScoreToOnline(hiScore);
+        sendScoreToOnline(hiScore, 'score');
       }, 1600);
     }
 
@@ -2137,8 +2330,11 @@
         `;
 
         if (it.owned) {
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation();
+          const selectSkin = (e) => {
+            if (e) {
+              e.stopPropagation();
+              e.preventDefault();
+            }
             currentCustom[type] = it.id;
             if (type === 'sound') {
               if (it.id === 'se_arcade') sound.soundType = 'arcade';
@@ -2148,14 +2344,16 @@
             sound.playTone(660, 0.08, 'square', 0.2);
             renderCustomModal();
             saveGameToStorage();
-          });
+          };
+          btn.addEventListener('click', selectSkin);
+          btn.addEventListener('touchend', selectSkin);
         }
         container.appendChild(btn);
       });
     }
 
     /* ==========================================================================
-       5. イベントハンドラ & UI連動
+       5. イベントハンドラ & タッチ最適化
        ========================================================================== */
     const actionBtn = document.getElementById('actionBtn');
     const restartBtn = document.getElementById('restartBtn');
@@ -2178,6 +2376,7 @@
     const rankingModal = document.getElementById('rankingModal');
     const closeRankingBtn = document.getElementById('closeRankingBtn');
     const tabScoreRank = document.getElementById('tabScoreRank');
+    const tabTimeRank = document.getElementById('tabTimeRank');
     const tabItemRank = document.getElementById('tabItemRank');
     const viewRankingBtn = document.getElementById('viewRankingBtn');
     const modalChangeNameBtn = document.getElementById('modalChangeNameBtn');
@@ -2187,6 +2386,9 @@
     const confirmNameChangeBtn = document.getElementById('confirmNameChangeBtn');
     const cancelNameChangeBtn = document.getElementById('cancelNameChangeBtn');
     const playerBadgeBtn = document.getElementById('playerBadgeBtn');
+
+    const confirmTaBtn = document.getElementById('confirmTaBtn');
+    const cancelTaBtn = document.getElementById('cancelTaBtn');
 
     function openNameChangeModal() {
       nameChangeInput.value = playerName;
@@ -2201,27 +2403,36 @@
       nameChangeModal.classList.add('hidden');
     }
 
-    playerBadgeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openNameChangeModal();
-    });
+    function attachTap(el, fn) {
+      if (!el) return;
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fn(e);
+      });
+      el.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        fn(e);
+      });
+    }
 
-    modalChangeNameBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openNameChangeModal();
-    });
+    attachTap(playerBadgeBtn, openNameChangeModal);
+    attachTap(modalChangeNameBtn, openNameChangeModal);
+    attachTap(cancelNameChangeBtn, closeNameChangeModal);
 
-    confirmNameChangeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
+    attachTap(confirmNameChangeBtn, () => {
       const val = nameChangeInput.value.trim() || 'player';
       changePlayerName(val);
       sound.playTone(880, 0.08, 'square', 0.2);
       closeNameChangeModal();
     });
 
-    cancelNameChangeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeNameChangeModal();
+    attachTap(confirmTaBtn, () => {
+      startTaCountdown();
+    });
+
+    attachTap(cancelTaBtn, () => {
+      taConfirmModal.classList.add('hidden');
     });
 
     nameChangeInput.addEventListener('keydown', (e) => {
@@ -2237,16 +2448,34 @@
     });
 
     function triggerAction(e) {
-      if (e) {
+      if (e && e.cancelable && e.type === 'touchstart') {
         e.preventDefault();
-        e.stopPropagation();
       }
       window.focus();
+      sound.init();
+
+      if (gameState === 'TITLE') {
+        const anyModalOpen = !howToModal.classList.contains('hidden') ||
+                             !prizeModal.classList.contains('hidden') ||
+                             !gachaModal.classList.contains('hidden') ||
+                             !customModal.classList.contains('hidden') ||
+                             !rankingModal.classList.contains('hidden') ||
+                             !nameChangeModal.classList.contains('hidden') ||
+                             !taConfirmModal.classList.contains('hidden');
+        if (!anyModalOpen) {
+          executeMenuSelection();
+        }
+        return;
+      }
+
       handleAction();
     }
 
     actionBtn.addEventListener('click', triggerAction);
-    actionBtn.addEventListener('touchstart', triggerAction, { passive: false });
+    actionBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      triggerAction(e);
+    });
 
     gameWrapper.addEventListener('click', (e) => {
       if (gameState === 'PLAYING' && document.getElementById('gameModal').classList.contains('hidden') && prizeModal.classList.contains('hidden')) {
@@ -2254,59 +2483,40 @@
       }
     });
 
-    restartBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      initGame();
-    });
+    attachTap(restartBtn, () => initGame(isTimeAttack));
+    attachTap(closePrizeBtn, () => prizeModal.classList.add('hidden'));
+    attachTap(rollGachaBtn, rollGaraponGacha);
+    attachTap(closeGachaBtn, () => gachaModal.classList.add('hidden'));
+    attachTap(closeCustomBtn, () => customModal.classList.add('hidden'));
+    attachTap(closeRankingBtn, () => rankingModal.classList.add('hidden'));
+    attachTap(closeHowToBtn, () => howToModal.classList.add('hidden'));
+    attachTap(menuTopBtn, returnToTitle);
+    attachTap(modalTitleBtn, returnToTitle);
 
-    closePrizeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      prizeModal.classList.add('hidden');
-    });
-
-    rollGachaBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      rollGaraponGacha();
-    });
-
-    closeGachaBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      gachaModal.classList.add('hidden');
-    });
-
-    closeCustomBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      customModal.classList.add('hidden');
-    });
-
-    closeRankingBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      rankingModal.classList.add('hidden');
-    });
-
-    tabScoreRank.addEventListener('click', (e) => {
-      e.stopPropagation();
+    attachTap(tabScoreRank, () => {
       currentRankingTab = 'score';
       renderRankingModal();
     });
 
-    tabItemRank.addEventListener('click', (e) => {
-      e.stopPropagation();
+    attachTap(tabTimeRank, () => {
+      currentRankingTab = 'time';
+      renderRankingModal();
+    });
+
+    attachTap(tabItemRank, () => {
       currentRankingTab = 'item';
       renderRankingModal();
     });
 
-    viewRankingBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
+    attachTap(viewRankingBtn, () => {
       renderRankingModal();
       rankingModal.classList.remove('hidden');
     });
 
-    soundToggle.addEventListener('click', (e) => {
-      e.stopPropagation();
+    attachTap(soundToggle, () => {
       sound.enabled = !sound.enabled;
       soundToggle.textContent = `SOUND: ${sound.enabled ? 'ON' : 'OFF'}`;
-      menuSoundLabel.textContent = `4. サウンド: ${sound.enabled ? 'ON' : 'OFF'}`;
+      menuSoundLabel.textContent = `5. サウンド: ${sound.enabled ? 'ON' : 'OFF'}`;
       soundToggle.classList.toggle('text-yellow-300', sound.enabled);
       soundToggle.classList.toggle('text-zinc-500', !sound.enabled);
       if (!sound.enabled) {
@@ -2339,18 +2549,23 @@
 
       switch (selectedMenuIndex) {
         case 0:
-          startGameFromMenu();
+          titleScreen.classList.add('hidden');
+          gameState = 'PLAYING';
+          initGame(false);
           break;
         case 1:
-          howToModal.classList.remove('hidden');
+          taConfirmModal.classList.remove('hidden');
           break;
         case 2:
+          howToModal.classList.remove('hidden');
+          break;
+        case 3:
           renderPrizeModal();
           prizeModal.classList.remove('hidden');
           break;
-        case 3:
+        case 4:
           sound.enabled = !sound.enabled;
-          menuSoundLabel.textContent = `4. サウンド: ${sound.enabled ? 'ON' : 'OFF'}`;
+          menuSoundLabel.textContent = `5. サウンド: ${sound.enabled ? 'ON' : 'OFF'}`;
           soundToggle.textContent = `SOUND: ${sound.enabled ? 'ON' : 'OFF'}`;
           soundToggle.classList.toggle('text-yellow-300', sound.enabled);
           soundToggle.classList.toggle('text-zinc-500', !sound.enabled);
@@ -2358,30 +2573,25 @@
             sound.stopBgm();
           }
           break;
-        case 4:
+        case 5:
           updatePointsDisplay();
           gachaModal.classList.remove('hidden');
           break;
-        case 5:
+        case 6:
           renderCustomModal();
           customModal.classList.remove('hidden');
           break;
-        case 6:
+        case 7:
           renderRankingModal();
           rankingModal.classList.remove('hidden');
           break;
       }
     }
 
-    function startGameFromMenu() {
-      titleScreen.classList.add('hidden');
-      gameState = 'PLAYING';
-      initGame();
-    }
-
     function returnToTitle() {
       gameState = 'TITLE';
       sound.stopBgm();
+      sound.resetTempo();
       document.getElementById('gameModal').classList.add('hidden');
       prizeModal.classList.add('hidden');
       howToModal.classList.add('hidden');
@@ -2389,6 +2599,8 @@
       customModal.classList.add('hidden');
       rankingModal.classList.add('hidden');
       nameChangeModal.classList.add('hidden');
+      taConfirmModal.classList.add('hidden');
+      countdownOverlay.classList.add('hidden');
       titleScreen.classList.remove('hidden');
       updatePointsDisplay();
       updatePlayerNameUI();
@@ -2398,28 +2610,20 @@
     for (let i = 0; i < MENU_COUNT; i++) {
       const item = document.getElementById(`menuOpt${i}`);
       if (!item) continue;
-      item.addEventListener('mouseenter', () => updateMenuSelection(i));
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
+      
+      const chooseOption = (e) => {
+        if (e) {
+          e.stopPropagation();
+          if (e.cancelable) e.preventDefault();
+        }
         selectedMenuIndex = i;
         executeMenuSelection();
-      });
+      };
+
+      item.addEventListener('mouseenter', () => updateMenuSelection(i));
+      item.addEventListener('click', chooseOption);
+      item.addEventListener('touchend', chooseOption);
     }
-
-    menuTopBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      returnToTitle();
-    });
-
-    modalTitleBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      returnToTitle();
-    });
-
-    closeHowToBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      howToModal.classList.add('hidden');
-    });
 
     window.addEventListener('keydown', (e) => {
       if (!nameChangeModal.classList.contains('hidden')) {
@@ -2431,16 +2635,18 @@
                              !prizeModal.classList.contains('hidden') ||
                              !gachaModal.classList.contains('hidden') ||
                              !customModal.classList.contains('hidden') ||
-                             !rankingModal.classList.contains('hidden');
+                             !rankingModal.classList.contains('hidden') ||
+                             !taConfirmModal.classList.contains('hidden');
 
         if (anyModalOpen) {
-          if (e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space') {
+          if (e.code === 'Escape') {
             e.preventDefault();
             howToModal.classList.add('hidden');
             prizeModal.classList.add('hidden');
             gachaModal.classList.add('hidden');
             customModal.classList.add('hidden');
             rankingModal.classList.add('hidden');
+            taConfirmModal.classList.add('hidden');
           }
           return;
         }
@@ -2465,7 +2671,8 @@
                          howToModal.classList.contains('hidden') && 
                          gachaModal.classList.contains('hidden') && 
                          customModal.classList.contains('hidden') &&
-                         rankingModal.classList.contains('hidden');
+                         rankingModal.classList.contains('hidden') &&
+                         countdownOverlay.classList.contains('hidden');
         if (noModals) {
           triggerAction();
         }
