@@ -28,6 +28,9 @@
     .crt-screen::before {
       display: none;
     }
+    #aimNeedle, #powerNeedle {
+      will-change: transform;
+    }
     canvas {
       image-rendering: pixelated;
       image-rendering: crisp-edges;
@@ -83,6 +86,7 @@
     .garapon-spinning {
       animation: garaponSpin 1.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
     }
+    
   </style>
 </head>
 <body class="flex flex-col items-center justify-between min-h-screen p-2 sm:p-4 bg-zinc-950">
@@ -424,7 +428,7 @@
             <div class="w-0.5 h-full bg-zinc-500"></div>
             <div class="w-0.5 h-full bg-zinc-500"></div>
           </div>
-          <div id="aimNeedle" class="absolute top-0 bottom-0 w-2.5 -ml-1.5 bg-yellow-400 border border-white"></div>
+          <div id="aimNeedle" class="absolute top-0 bottom-0 left-0 w-2.5 -ml-1.5 bg-yellow-400 border border-white"></div>
         </div>
       </div>
 
@@ -434,7 +438,7 @@
           <div id="zoneFront" class="absolute top-0 bottom-0 bg-blue-500/80 border-x border-blue-200"></div>
           <div id="zoneMid" class="absolute top-0 bottom-0 bg-yellow-500/85 border-x border-yellow-200"></div>
           <div id="zoneBack" class="absolute top-0 bottom-0 bg-red-600/90 border-x border-red-300"></div>
-          <div id="powerNeedle" class="absolute top-0 bottom-0 w-2.5 -ml-1.5 bg-white border border-red-400 z-10"></div>
+          <div id="powerNeedle" class="absolute top-0 bottom-0 left-0 w-2.5 -ml-1.5 bg-white border border-red-400 z-10"></div>
         </div>
       </div>
 
@@ -1195,13 +1199,15 @@
         aimX += aimXDirection * aimSpeed * dt;
         if (aimX > 1.0) { aimX = 1.0; aimXDirection = -1; }
         else if (aimX < 0.0) { aimX = 0.0; aimXDirection = 1; }
-        aimNeedle.style.left = `${aimX * 100}%`;
+        const parentW = aimNeedle.parentElement.clientWidth || 200;
+        aimNeedle.style.transform = `translate3d(${aimX * parentW}px, 0, 0)`;
       } else if (meterState === 'AIM_POWER') {
         const powerSpeed = 1.95 * speedMultiplier;
         power += powerDirection * powerSpeed * dt;
         if (power > 1.0) { power = 1.0; powerDirection = -1; }
         else if (power < 0.0) { power = 0.0; powerDirection = 1; }
-        powerNeedle.style.left = `${power * 100}%`;
+        const parentW = powerNeedle.parentElement.clientWidth || 200;
+        powerNeedle.style.transform = `translate3d(${power * parentW}px, 0, 0)`;
       }
 
       PEGS.forEach(peg => {
@@ -2544,9 +2550,18 @@
       handleAction();
     }
 
-    actionBtn.addEventListener('click', triggerAction);
+   let lastTouchTime = 0;
+
     actionBtn.addEventListener('touchend', (e) => {
       e.preventDefault();
+      lastTouchTime = performance.now();
+      triggerAction(e);
+    }, { passive: false });
+
+    actionBtn.addEventListener('click', (e) => {
+      if (performance.now() - lastTouchTime < 400) {
+        return;
+      }
       triggerAction(e);
     });
 
