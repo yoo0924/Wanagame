@@ -1181,7 +1181,7 @@
         updateEnvironmentUI();
       }
 
-      const speedMultiplier = isTimeAttack ? 1.25 : (1.0 + Math.min(0.6, (currentRound - 1) * 0.15));
+      const speedMultiplier = isTimeAttack ? 1.0 : (1.0 + Math.min(0.6, (currentRound - 1) * 0.15));
 
       if (meterState === 'AIM_X') {
         const aimSpeed = 1.65 * speedMultiplier;
@@ -2471,17 +2471,28 @@
       handleAction();
     }
 
-    actionBtn.addEventListener('click', triggerAction);
-    actionBtn.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      triggerAction(e);
-    });
+    let isTouchHandled = false;
 
-    gameWrapper.addEventListener('click', (e) => {
+    actionBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault(); // スクロールやズームの遅延を完全にカット
+      isTouchHandled = true;
+      triggerAction(e);
+    }, { passive: false });
+
+    actionBtn.addEventListener('click', (e) => {
+      if (isTouchHandled) {
+        isTouchHandled = false; // スマホでの二重反応を防ぐ
+        return;
+        }
+        triggerAction(e);
+      });
+
+    gameWrapper.addEventListener('touchstart', (e) => {
       if (gameState === 'PLAYING' && document.getElementById('gameModal').classList.contains('hidden') && prizeModal.classList.contains('hidden')) {
+        e.preventDefault();
         triggerAction(e);
       }
-    });
+    }, { passive: false });
 
     attachTap(restartBtn, () => initGame(isTimeAttack));
     attachTap(closePrizeBtn, () => prizeModal.classList.add('hidden'));
