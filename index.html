@@ -1175,6 +1175,7 @@
         if (timeRemaining <= 0) {
           timeRemaining = 0;
           updateEnvironmentUI();
+          gameState = 'GAMEOVER';
           showGameOver();
           return;
         }
@@ -1760,6 +1761,10 @@
     }
 
     function showGameOver() {
+      if (!document.getElementById('gameModal').classList.contains('hidden')) {
+        return;
+      }
+      gameState = 'GAMEOVER';
       sound.stopBgm();
       sound.resetTempo();
 
