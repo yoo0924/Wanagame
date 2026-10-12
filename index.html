@@ -2553,19 +2553,20 @@
       handleAction();
     }
 
-   let lastTouchTime = 0;
+   let isTouchTriggered = false;
 
-    actionBtn.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      lastTouchTime = performance.now();
-      triggerAction(e);
+	actionBtn.addEventListener('touchstart', (e) => {
+    		e.preventDefault(); // タッチ遅延を完全にカット
+        isTouchTriggered = true;
+        triggerAction(e);
     }, { passive: false });
-
+    
     actionBtn.addEventListener('click', (e) => {
-      if (performance.now() - lastTouchTime < 400) {
-        return;
-      }
-      triggerAction(e);
+        if (isTouchTriggered) {
+            isTouchTriggered = false;
+            return;
+        }
+        triggerAction(e);
     });
 
     gameWrapper.addEventListener('click', (e) => {
